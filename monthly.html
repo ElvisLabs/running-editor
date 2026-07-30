@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跑步 · 本月数据</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: #2b2b2d; }
+body { font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", sans-serif; }
+.num { font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif; }
+
+/* ================= edit panel ================= */
+.panel {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 300px; z-index: 10;
+  background: #16213e; color: #e0e0e0; padding: 20px; overflow-y: auto;
+}
+.panel h1 { font-size: 17px; color: #4db890; border-bottom: 1px solid #2a3a5c; padding-bottom: 10px; margin-bottom: 14px; }
+.panel h2 { font-size: 12px; color: #8899bb; margin: 14px 0 6px; letter-spacing: 1px; }
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: 12px; color: #99aabb; margin-bottom: 3px; }
+.field input, .field select {
+  width: 100%; padding: 7px 10px; background: #0f3460;
+  border: 1px solid #2a3a5c; border-radius: 6px; color: #e0e0e0; font-size: 13px; outline: none;
+}
+.field input:focus { border-color: #4db890; }
+.row2 { display: flex; gap: 10px; }
+.row2 .field { flex: 1; }
+.tip { font-size: 11px; color: #667799; line-height: 1.5; margin-top: 2px; }
+.chk { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #7fd8b6; margin: 0 0 10px; cursor: pointer; }
+.chk input { width: auto; margin: 0; }
+.field input.auto { background: #0b2136; color: #6fb99b; border-style: dashed; }
+.btn {
+  width: 100%; padding: 8px; background: #2a6b57; color: #eaf7f1;
+  border: none; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.btn:hover { background: #34816a; }
+.btn.export { margin-bottom: 14px; background: #168267; font-weight: 600; }
+.btn.export:hover { background: #1a9a79; }
+.btn:disabled { opacity: .65; cursor: wait; }
+
+/* ================= preview ================= */
+.viewport { margin-left: 300px; display: flex; justify-content: center; padding: 24px 0; }
+#scalebox { flex-shrink: 0; }
+
+/* stage is 1:1 with the original screenshot: 921 x 2000 */
+.stage {
+  position: relative; width: 921px; height: 2000px; overflow: hidden;
+  transform-origin: top left; background: #fff; color: #1a1a1a;
+}
+
+/* ---- status bar ----
+   Every value below is measured off a real iOS screenshot (iPhone 16e simulator,
+   1170px wide, status bar overridden to 12:41 / 4 bars / wifi / 85%) and scaled
+   by 921/1170. Do not eyeball these — re-measure from a simulator capture. */
+.status { position: absolute; left: 0; top: 0; right: 0; height: 100px; color: #000; }
+.s-time {
+  position: absolute; left: 75.4px; top: 38.5px;
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 37.5px; font-weight: 600; letter-spacing: 0; line-height: 1;
+}
+.s-loc {
+  position: absolute; left: 182px; top: 40px; width: 36px; height: 36px;
+  border-radius: 50%; background: #0a7aff;
+  display: flex; align-items: center; justify-content: center;
+}
+.s-loc svg { width: 19px; height: 19px; }
+.sig {
+  position: absolute; left: 714px; top: 44.9px; height: 26.8px;
+  display: flex; align-items: flex-end; gap: 3.9px;
+}
+.sig i { display: block; width: 7.1px; border-radius: 2px; background: #000; }
+.sig i:nth-child(1) { height: 9.4px; }
+.sig i:nth-child(2) { height: 14.2px; }
+.sig i:nth-child(3) { height: 20.5px; }
+.sig i:nth-child(4) { height: 26.8px; }
+/* the wifi glyph itself is lifted straight out of the simulator screenshot */
+.wifi {
+  position: absolute; left: 766px; top: 42.6px; width: 39px; height: 30px;
+}
+.batt {
+  position: absolute; left: 818.7px; top: 43.3px;
+  width: 53.5px; height: 29.9px; border-radius: 6.3px;
+  background: #000; color: #fff;
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 26.4px; font-weight: 500; letter-spacing: -.3px;
+  display: flex; align-items: center; justify-content: center;
+}
+.batt::after {
+  content: ""; position: absolute; left: 55.8px; top: 10.2px;
+  width: 3.1px; height: 9.4px; border-radius: 0 2px 2px 0; background: #000;
+}
+
+/* ---- nav bar ---- */
+.nav { position: absolute; left: 0; top: 100px; right: 0; height: 100px; border-bottom: 2px solid #f1f2f3; }
+.back {
+  position: absolute; left: 44px; top: 36px; width: 26px; height: 26px;
+  border-left: 5px solid #9aa0a3; border-bottom: 5px solid #9aa0a3;
+  transform: rotate(45deg); border-radius: 2px;
+}
+.nav-title {
+  position: absolute; left: 0; right: 0; top: 0; height: 100px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  font-size: 40px; font-weight: 600;
+}
+.caret {
+  width: 0; height: 0; margin-top: 6px;
+  border-left: 11px solid transparent; border-right: 11px solid transparent;
+  border-top: 13px solid #b9bec1;
+}
+.share { position: absolute; right: 44px; top: 31px; font-size: 36px; color: #16c39a; }
+
+/* ---- tabs ---- */
+.tabs { position: absolute; left: 0; top: 202px; right: 0; height: 128px; display: flex; border-bottom: 2px solid #f1f2f3; }
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; position: relative;
+}
+.tab + .tab::before {
+  content: ""; position: absolute; left: 0; top: 20px; bottom: 20px;
+  width: 2px; background: #f1f2f3;
+}
+.tab .t1 { font-size: 44px; font-weight: 600; color: #1a1a1a; line-height: 1; }
+.tab .t2 { font-size: 24px; color: #9aa0a3; line-height: 1; }
+.tab.on .t1 { color: #16c39a; }
+.tab.on .t2 { color: #fff; background: #16c39a; padding: 6px 18px 8px; border-radius: 20px; }
+
+/* ---- date switcher ---- */
+.dateline {
+  position: absolute; left: 0; top: 330px; right: 0; height: 112px;
+  display: flex; align-items: center; justify-content: center; gap: 60px;
+}
+.dateline .tri { width: 0; height: 0; }
+.tri.l { border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 16px solid #75797c; }
+.tri.r { border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 16px solid #75797c; }
+.dateline b { font-size: 38px; font-weight: 600; letter-spacing: 1px; }
+
+/* ---- chart: grid x 115..890, y 495(max) .. 893(0.0) ---- */
+#plot { position: absolute; left: 115px; top: 495px; width: 775px; height: 398px; }
+#plot .grid {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: repeating-linear-gradient(90deg, #e3e4e5 0 14px, rgba(0,0,0,0) 14px 24px);
+}
+.ylab {
+  position: absolute; right: calc(100% + 16px); transform: translateY(-50%);
+  font-size: 26px; color: #b3b7b9; line-height: 1;
+}
+.bar { position: absolute; bottom: 0; transform: translateX(-50%); border-radius: 2px; }
+.bar.hi { background: linear-gradient(180deg, #f3c65a 0%, #eab53b 100%); }
+.bar.lo { background: linear-gradient(180deg, #35cb97 0%, #1fbd8b 100%); }
+.peaklab {
+  position: absolute; transform: translateX(-50%);
+  font-size: 30px; font-weight: 600; color: #e9ac25; line-height: 1;
+}
+#xlabs { position: absolute; left: 115px; top: 925px; width: 775px; height: 40px; }
+#xlabs span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 28px; color: #a4a8ab; line-height: 1;
+}
+
+.band { position: absolute; left: 0; right: 0; background: #f4f5f6; }
+
+/* ---- stats ---- */
+.s-lb { position: absolute; font-size: 32px; color: #222; line-height: 1.1; }
+.s-vl { position: absolute; font-size: 66px; font-weight: 700; color: #111; line-height: 1; }
+.s-vl small { font-size: 28px; font-weight: 400; color: #9aa0a3; margin-left: 8px; }
+
+/* ---- comparison ---- */
+.cmp-title { position: absolute; left: 48px; top: 1552px; font-size: 34px; font-weight: 600; color: #1a1a1a; line-height: 1.1; }
+.cmp-th { position: absolute; top: 1645px; font-size: 28px; color: #565b5e; line-height: 1.1; }
+.cmp-name { position: absolute; font-size: 30px; color: #1a1a1a; line-height: 1.1; }
+.cbar { position: absolute; height: 30px; border-radius: 15px; }
+.cbar.green { background: linear-gradient(90deg, #8fdfbc 0%, #2ec695 100%); }
+.cbar.blue { background: linear-gradient(90deg, #a3aef6 0%, #7688f0 100%); }
+.cval { position: absolute; font-size: 34px; font-weight: 700; color: #111; line-height: 1; white-space: nowrap; }
+.cval small { font-size: 26px; font-weight: 400; color: #9aa0a3; margin-left: 6px; }
+
+/* ---- bottom teaser (cut off like the screenshot) ---- */
+.teaser-tx { position: absolute; left: 48px; top: 1940px; font-size: 36px; font-weight: 600; color: #1a1a1a; line-height: 1.1; }
+.mascot {
+  position: absolute; right: 48px; top: 1925px;
+  width: 120px; height: 120px; border-radius: 50%; background: #dff4e9;
+  display: flex; align-items: center; justify-content: center;
+}
+.mascot svg { width: 68px; height: 68px; }
+</style>
+</head>
+<body>
+
+<!-- ================= edit panel ================= -->
+<aside class="panel">
+  <h1>月数据页编辑</h1>
+
+  <div class="field"><label>预览缩放</label>
+    <select id="in-scale">
+      <option value="0.4">40%</option>
+      <option value="0.5" selected>50%（默认）</option>
+      <option value="0.75">75%</option>
+      <option value="1">100%（与原图 1:1）</option>
+    </select>
+  </div>
+  <button class="btn export" id="btn-export">导出 PNG 截图</button>
+
+  <h2>状态栏</h2>
+  <div class="row2">
+    <div class="field"><label>时间</label><input id="in-stime" value="12:41"></div>
+    <div class="field"><label>电量 %</label><input id="in-batt" value="85"></div>
+  </div>
+
+  <h2>日期</h2>
+  <div class="field"><label>年/月</label><input id="in-date" value="2026/07"></div>
+
+  <h2>累计数据（你填这里）</h2>
+  <div class="row2">
+    <div class="field"><label>累计里程</label><input id="in-km" value="11.57"></div>
+    <div class="field"><label>累计次数</label><input id="in-count" value="2"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>累计时长</label><input id="in-time" value="21:30:46"></div>
+    <div class="field"><label>配速 ＝ 时长÷里程</label><input id="in-pace" value=">60'00&quot;"></div>
+  </div>
+
+  <h2>柱状图（自动生成）</h2>
+  <label class="chk"><input type="checkbox" id="in-auto" checked> 由累计里程自动分配到每一天</label>
+  <button class="btn" id="btn-regen">换一种分布</button>
+  <div class="field" style="margin-top:10px"><label>每日数据（日:公里，逗号分隔）</label>
+    <input id="in-runs" value="">
+    <p class="tip">合计恰好等于累计里程，最高那根自动变黄并标数值。取消勾选即可手填，此时累计里程改为按这里反推。</p>
+  </div>
+  <div class="field"><label>Y 轴满刻度 ＝ 峰值向上取整</label><input id="in-max" value="10"></div>
+
+  <h2>本月 / 上月对比</h2>
+  <div class="row2">
+    <div class="field"><label>本月 ＝ 累计里程</label><input id="in-this" value="11.57"></div>
+    <div class="field"><label>上月公里（手填）</label><input id="in-last" value="27.76"></div>
+  </div>
+  <p class="tip">标题"比上月多/少 X.XX 公里"和条形宽度自动计算</p>
+
+  <p class="tip" style="margin-top:14px">所有修改即时生效。点击“导出 PNG 截图”即可按 921 × 2000 原始尺寸保存，预览缩放不影响导出结果。</p>
+</aside>
+
+<!-- ================= screen ================= -->
+<div class="viewport"><div id="scalebox"><div class="stage">
+
+  <!-- status bar -->
+  <div class="status">
+    <span class="s-time" id="o-stime">12:41</span>
+    <span class="s-loc">
+      <svg viewBox="0 0 16 16" fill="#fff"><path d="M1.5 7.2 L14.5 1.5 L8.8 14.5 L7.4 8.6 Z"/></svg>
+    </span>
+    <span class="sig"><i></i><i></i><i></i><i></i></span>
+    <img class="wifi" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACcAAAAeCAYAAACv1gdQAAADa0lEQVR42sWXv09UQRDHP+84BBQJxB8RY6GiZ9CE2NFZGangH5BoYzTQUaihMBRGK3tiQWMoKEgMsZKgNNhQGQoJnkFJ0JgoUiiIvLt3Nt8142bvuAcim2x4ezs7893Zme8MNVQ/aoAskAT29gF1QL1kIqAYkKvVXqkag1EKGafwAHAeOAscB04Ch4D9AvgLWAdWgA/AJyAPvAHWyuhMBc4/HAFdQDdwUcCOpPD6FwF8DTwDnnu6qdabWfPdDPQDc7p1ycyCvLQJxJoF872p/YJ3bk36+qU/ZLcisCbgJrAUAFRQPCXeXmKm/3vRnLV7S7LTVAlgZNx7CZiqYDTxZrECoGSL805+SnZ9LGQMyDvAqg7EnoIQCDu/AYv6W07GgbbrWN+rwG3rMIewHngMXNO6YFzsFNZq/QP4DEzqxu+Brya+ssraw8Ap4DJwBTgGNEpHLGrKBOw9AW4BGwBHgQnjnaLnLfe9CDwCOtne6NT5xTL6re0J4aIn8IzW/SvAQyDnxai7eRSgJPdbRnJ2Pyd9K4Fwsc/c7Uh1xAC0GfUUaDeK68zzph21Ou9Gu/RbJnDARkwIkAXGjOAm8EC3dqXLKj4InBMNjAIvgXnF4rzWo9rPSd5e0Op9IHvO9pillMiUpXHgLdDr1dSMIeUbwHSFjAzNaZ1rNgxRY2z0yu64cPxVvSzANqPA0sx1YKYKLqvEgTPSQ8BGWwhYqM7aIG4Ahk2C+HGZGPaPzXdSJp6K0tfgJdeWzUhkMhB1HJNGaeyB2qxAzKH92FxyUvpDdv94yB8lI3RXzxArSDOGmC1NLChmFpQU6yJht594AGJ1NhvAizQ9nnVtTh2Ef+sSsAzcUyt1GmhRpWnRukv7yx7ROu/PGe6M0vKS81KHejH7NPeB1ir7w1bJ25DIS69f21ONrCk9eXW2Pd4FQsTsCNca7tH5vCmB2X/RppdEukXgnRd7mORpBL6rT/NfIAHOKA4XqomzKEUMlowx9zz1QJ/q4AmtfwIf1Y4PK+gjkxikTYBqY9Cmewcwu0VlmDWxFQWIfdfGK5OBBdPy2HVJcv9tOM9d1ZP53a1tgzYkty262MkTo3izFaHkVYS+ndLFTmlmwOtknRcHqv2Xb7c9OOi13YN75TEC7TrAkKrAUKCz2VOAzkMXjMd2DOw3NEOOkJ0VHMsAAAAASUVORK5CYII=">
+    <span class="batt" id="o-batt">85</span>
+  </div>
+
+  <!-- nav -->
+  <div class="nav">
+    <i class="back"></i>
+    <div class="nav-title">跑步 <i class="caret"></i></div>
+    <span class="share">分享</span>
+  </div>
+
+  <!-- tabs -->
+  <div class="tabs">
+    <div class="tab"><span class="t1">总</span><span class="t2">总数据</span></div>
+    <div class="tab"><span class="t1">周</span><span class="t2">本周数据</span></div>
+    <div class="tab on"><span class="t1">月</span><span class="t2">本月数据</span></div>
+    <div class="tab"><span class="t1">年</span><span class="t2">一年数据</span></div>
+  </div>
+
+  <!-- date -->
+  <div class="dateline">
+    <i class="tri l"></i>
+    <b class="num" id="o-date">2026/07</b>
+    <i class="tri r"></i>
+  </div>
+
+  <!-- chart -->
+  <div id="plot">
+    <div class="grid" style="top: 0;"></div>
+    <div class="grid" style="top: 199px;"></div>
+    <div class="grid" style="bottom: 0;"></div>
+    <span class="ylab num" style="top: 0;" id="o-ymax">10.0</span>
+    <span class="ylab num" style="top: 199px;" id="o-ymid">5.0</span>
+    <span class="ylab num" style="top: 398px;">0.0</span>
+  </div>
+  <div id="xlabs" class="num"></div>
+
+  <div class="band" style="top: 995px; height: 16px;"></div>
+
+  <!-- stats -->
+  <span class="s-lb" style="left: 48px;  top: 1072px;">累计里程</span>
+  <span class="s-lb" style="left: 500px; top: 1072px;">累计次数</span>
+  <span class="s-vl num" style="left: 48px;  top: 1150px;"><span id="o-km">11.57</span> <small>公里</small></span>
+  <span class="s-vl num" style="left: 500px; top: 1150px;"><span id="o-count">2</span> <small>次</small></span>
+
+  <span class="s-lb" style="left: 48px;  top: 1302px;">累计时长</span>
+  <span class="s-lb" style="left: 500px; top: 1302px;">平均配速</span>
+  <span class="s-vl num" style="left: 48px;  top: 1380px;" id="o-time">21:30:46</span>
+  <span class="s-vl num" style="left: 500px; top: 1380px;" id="o-pace">&gt;60'00"</span>
+
+  <div class="band" style="top: 1495px; height: 16px;"></div>
+
+  <!-- comparison -->
+  <p class="cmp-title" id="o-cmp-title">本月跑步里程比上月少 16.19 公里</p>
+  <span class="cmp-th" style="left: 48px;">月次</span>
+  <span class="cmp-th" style="left: 135px;">里程</span>
+  <span class="cmp-name" id="cmp-n1" style="left: 48px;">本月</span>
+  <span class="cmp-name" id="cmp-n2" style="left: 48px;">上月</span>
+
+  <div class="band" style="top: 1893px; height: 16px;"></div>
+
+  <!-- bottom, cut off at screen edge like the screenshot -->
+  <p class="teaser-tx">本月的跑步里程已经超过了</p>
+  <div class="mascot">
+    <svg viewBox="0 0 32 32" fill="#3fbe8a">
+      <circle cx="16" cy="10" r="4.4"/>
+      <path d="M9 24c0-4.4 3.1-7.5 7-7.5s7 3.1 7 7.5c0 1.6-1.2 2.6-2.8 2.6H11.8C10.2 26.6 9 25.6 9 24z"/>
+    </svg>
+  </div>
+
+</div></div></div>
+
+<script src="./vendor/html2canvas-1.4.1.min.js"></script>
+<script src="./export-stage.js"></script>
+<script>
+// x slot centers measured from the original: day1 = 124, step 25.03 (stage coords)
+const X0 = 9, STEP = 25.033, CH = 398;   // relative to #plot's left (stage x 115)
+
+const $ = id => document.getElementById(id);
+
+function parseRuns(str) {
+  const runs = {};
+  str.split(/[,，]/).forEach(part => {
+    const m = part.split(/[:：]/);
+    const d = parseInt(m[0], 10), v = parseFloat(m[1]);
+    if (d >= 1 && d <= 31 && v > 0) runs[d] = v;
+  });
+  return runs;
+}
+
+function parseHMS(str) {
+  const p = String(str).split(/[:：]/).map(Number);
+  if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+  if (p.length === 2) return p[0] * 60 + p[1];
+  return 0;
+}
+
+function fmtPace(sec, km) {
+  if (!km || !sec) return "0'00\"";
+  const p = sec / km;
+  if (p >= 3600) return ">60'00\"";           // the app caps pace at 60 min/km
+  return Math.floor(p / 60) + "'" + String(Math.round(p % 60)).padStart(2, '0') + '"';
+}
+
+function niceMax(peak) {
+  if (peak <= 0) return 10;
+  return peak <= 5 ? Math.ceil(peak) : Math.ceil(peak / 5) * 5;
+}
+
+function makeRng(seed) {
+  let a = seed | 0;
+  return () => {
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function daysInMonth(dateStr) {
+  const m = String(dateStr).match(/(\d{4})\D+(\d{1,2})/);
+  if (!m) return 31;
+  return new Date(+m[1], +m[2], 0).getDate();
+}
+
+// spread a monthly total over N random days so the parts sum back to it exactly
+function genRuns(total, count, days, seed) {
+  count = Math.max(1, Math.min(Math.round(count) || 1, days));
+  if (!(total > 0)) return {};
+  const rand = makeRng(seed);
+  const pool = Array.from({ length: days }, (_, i) => i + 1);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const chosen = pool.slice(0, count).sort((a, b) => a - b);
+  const w = chosen.map(() => 0.45 + rand());
+  const sw = w.reduce((a, b) => a + b, 0);
+  const vals = w.map(x => Math.max(0.01, Math.round(x / sw * total * 100) / 100));
+  const drift = Math.round((total - vals.reduce((a, b) => a + b, 0)) * 100) / 100;
+  const mi = vals.indexOf(Math.max(...vals));
+  vals[mi] = Math.max(0.01, Math.round((vals[mi] + drift) * 100) / 100);
+  const out = {};
+  chosen.forEach((d, i) => out[d] = vals[i]);
+  return out;
+}
+
+let distSeed = 20260729;
+
+// auto: 累计里程 → 每日分布 → 配速/满刻度/本月对比
+// manual: 每日分布 → 累计里程/次数/配速/满刻度/本月对比
+function syncDerived() {
+  const auto = $('in-auto').checked;
+  $('in-runs').readOnly = auto;
+  $('in-runs').classList.toggle('auto', auto);
+  ['in-km', 'in-count'].forEach(id => {
+    $(id).readOnly = !auto;
+    $(id).classList.toggle('auto', !auto);
+  });
+  ['in-pace', 'in-max', 'in-this'].forEach(id => {
+    $(id).readOnly = true;
+    $(id).classList.add('auto');
+  });
+
+  let vals;
+  if (auto) {
+    const total = parseFloat($('in-km').value) || 0;
+    const runs = genRuns(total, parseFloat($('in-count').value), daysInMonth($('in-date').value), distSeed);
+    $('in-runs').value = Object.entries(runs).map(([d, v]) => d + ':' + v.toFixed(2)).join(', ');
+    vals = Object.values(runs);
+  } else {
+    vals = Object.values(parseRuns($('in-runs').value));
+    const sum = vals.reduce((a, b) => a + b, 0);
+    $('in-km').value = sum.toFixed(2);
+    $('in-count').value = vals.length;
+  }
+
+  const sum = vals.reduce((a, b) => a + b, 0);
+  const peak = vals.length ? Math.max(...vals) : 0;
+  $('in-pace').value = fmtPace(parseHMS($('in-time').value), sum);
+  $('in-max').value  = niceMax(peak);
+  $('in-this').value = sum.toFixed(2);
+}
+
+function renderChart() {
+  const plot = $('plot');
+  plot.querySelectorAll('.bar, .peaklab').forEach(el => el.remove());
+  const runs = parseRuns($('in-runs').value);
+  const max = parseFloat($('in-max').value) || 10;
+  $('o-ymax').textContent = max.toFixed(1);
+  $('o-ymid').textContent = (max / 2).toFixed(1);
+
+  const peakDay = Object.keys(runs).reduce((a, b) => (runs[a] >= runs[b] ? a : b), Object.keys(runs)[0]);
+  for (const [day, km] of Object.entries(runs)) {
+    const hi = day === peakDay;
+    const bar = document.createElement('div');
+    bar.className = 'bar ' + (hi ? 'hi' : 'lo');
+    const h = Math.min(km / max, 1) * CH;
+    bar.style.left = (X0 + (day - 1) * STEP) + 'px';
+    bar.style.width = '12px';
+    bar.style.height = h + 'px';
+    plot.appendChild(bar);
+    if (hi) {
+      const lab = document.createElement('span');
+      lab.className = 'peaklab num';
+      lab.style.left = (X0 + (day - 1) * STEP) + 'px';
+      lab.style.bottom = (h + 22) + 'px';
+      lab.textContent = km.toFixed(2);
+      plot.appendChild(lab);
+    }
+  }
+}
+
+function renderCompare() {
+  const stage = document.querySelector('.stage');
+  stage.querySelectorAll('.cbar, .cval').forEach(el => el.remove());
+  const tv = parseFloat($('in-this').value) || 0;
+  const lv = parseFloat($('in-last').value) || 0;
+  const diff = tv - lv;
+  $('o-cmp-title').textContent =
+    '本月跑步里程比上月' + (diff >= 0 ? '多' : '少') + ' ' + Math.abs(diff).toFixed(2) + ' 公里';
+
+  const FULL = 560, BAR_X = 135, ROWS = [1720, 1805];
+  const maxV = Math.max(tv, lv, 0.01);
+  [['green', tv], ['blue', lv]].forEach(([cls, v], i) => {
+    const w = Math.max(16, v / maxV * FULL);
+    const bar = document.createElement('div');
+    bar.className = 'cbar ' + cls;
+    bar.style.left = BAR_X + 'px';
+    bar.style.top = ROWS[i] + 'px';
+    bar.style.width = w + 'px';
+    stage.appendChild(bar);
+    const val = document.createElement('span');
+    val.className = 'cval num';
+    val.style.left = (BAR_X + w + 20) + 'px';
+    val.style.top = (ROWS[i] - 2) + 'px';
+    val.innerHTML = v.toFixed(2) + ' <small>公里</small>';
+    stage.appendChild(val);
+    $('cmp-n' + (i + 1)).style.top = (ROWS[i] - 1) + 'px';
+  });
+}
+
+function renderAll() {
+  syncDerived();
+  $('o-stime').textContent = $('in-stime').value;
+  $('o-batt').textContent  = $('in-batt').value;
+  $('o-date').textContent  = $('in-date').value;
+  $('o-km').textContent    = $('in-km').value;
+  $('o-count').textContent = $('in-count').value;
+  $('o-time').textContent  = $('in-time').value;
+  $('o-pace').textContent  = $('in-pace').value;
+  renderChart();
+  renderCompare();
+}
+
+function applyScale() {
+  const s = parseFloat($('in-scale').value);
+  const stage = document.querySelector('.stage');
+  stage.style.transform = 'scale(' + s + ')';
+  $('scalebox').style.width  = (921 * s) + 'px';
+  $('scalebox').style.height = (2000 * s) + 'px';
+}
+
+document.querySelectorAll('.panel input').forEach(el => {
+  el.addEventListener('input', renderAll);
+  el.addEventListener('change', renderAll);
+});
+$('in-scale').addEventListener('change', applyScale);
+$('btn-regen').addEventListener('click', () => {
+  distSeed = (distSeed * 1103515245 + 12345) & 0x7fffffff;
+  $('in-auto').checked = true;
+  renderAll();
+});
+$('btn-export').addEventListener('click', async () => {
+  const button = $('btn-export');
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = '正在导出…';
+  try {
+    renderAll();
+    const date = $('in-date').value.trim().replace(/\D+/g, '_').replace(/^_|_$/g, '');
+    await exportStagePNG(document.querySelector('.stage'), `running_monthly_${date || 'export'}.png`);
+  } catch (error) {
+    console.error(error);
+    alert('导出失败：' + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+});
+
+// x-axis labels (fixed 1..31)
+(function () {
+  const xl = $('xlabs');
+  [1, 6, 11, 16, 21, 26, 31].forEach(d => {
+    const s = document.createElement('span');
+    s.style.left = (X0 + (d - 1) * STEP) + 'px';
+    s.textContent = d;
+    xl.appendChild(s);
+  });
+})();
+
+renderAll();
+applyScale();
+</script>
+</body>
+</html>
