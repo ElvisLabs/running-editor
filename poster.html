@@ -77,7 +77,7 @@ body {
 <body>
 <aside class="panel">
   <h1>海报数字编辑</h1>
-  <p class="intro">使用你提供的原始截图作为底图，只覆盖下列五处数字。人物、柱状图、文字、Logo、二维码及其他像素保持原样。</p>
+  <p class="intro">使用你提供的原始截图作为底图，只覆盖下列数值、百分比和地区。人物、柱状图、其他文字、Logo、二维码及其他像素保持原样。</p>
 
   <h2>预览</h2>
   <div class="field">
@@ -114,11 +114,21 @@ body {
     <label for="in-pace">平均配速</label>
     <input id="in-pace" value="11'00&quot;">
   </div>
+  <div class="row">
+    <div class="field">
+      <label for="in-pct">超过百分比 %</label>
+      <input id="in-pct" value="25.3" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label for="in-city">地区</label>
+      <input id="in-city" value="盐城市">
+    </div>
+  </div>
 
   <button class="btn" id="btn-export">导出原尺寸 PNG</button>
   <button class="btn secondary" id="btn-reset">恢复原截图数字</button>
   <p class="tip" style="margin-top:10px">导出固定为 1279 × 2340，不受预览缩放影响。</p>
-  <div class="proof">像素保护：底图数字区域之外与原截图逐像素一致；图表不会随次数或里程重新生成。</div>
+  <div class="proof">像素保护：七个可编辑区域之外与原截图逐像素一致；图表不会随次数或里程重新生成。</div>
 </aside>
 
 <main class="viewport">
@@ -143,7 +153,9 @@ const originalValues = {
   time: '21:30:46',
   count: '2',
   dist: '7.89',
-  pace: ">60'00\""
+  pace: ">60'00\"",
+  pct: '25.3',
+  city: '盐城市'
 };
 
 function assetLoaded() {
@@ -161,20 +173,23 @@ template.onerror = originalPoster.onerror =
 template.src = './assets/poster-number-template.png';
 originalPoster.src = './assets/poster-original.png';
 
-function setNumberFont(size, weight = 700) {
-  ctx.font = `${weight} ${size}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
-  ctx.fillStyle = '#fbfdfd';
+function setTextFont(size, weight = 700, color = '#fbfdfd') {
+  ctx.font = `${weight} ${size}px -apple-system, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif`;
+  ctx.fillStyle = color;
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
 }
 
-function fitAndDraw(text, x, baseline, maxWidth, initialSize, align = 'left', weight = 700) {
+function fitAndDraw(
+  text, x, baseline, maxWidth, initialSize,
+  align = 'left', weight = 700, color = '#fbfdfd'
+) {
   const value = String(text).trim();
   let size = initialSize;
-  setNumberFont(size, weight);
+  setTextFont(size, weight, color);
   while (size > 34 && ctx.measureText(value).width > maxWidth) {
     size -= 1;
-    setNumberFont(size, weight);
+    setTextFont(size, weight, color);
   }
   ctx.textAlign = align;
   ctx.fillText(value, x, baseline);
@@ -203,6 +218,10 @@ function renderPoster() {
     value => fitAndDraw(value, 63, 1714, 185, 76));
   drawChangedValue('pace', [697, 1642, 341, 88],
     value => fitAndDraw(value, 704, 1714, 325, 76));
+  drawChangedValue('pct', [710, 1848, 150, 80],
+    value => fitAndDraw(`${value.replace(/%$/, '')}%`, 720, 1912, 138, 50, 'left', 400, '#e9edef'));
+  drawChangedValue('city', [858, 1848, 250, 80],
+    value => fitAndDraw(value, 864, 1912, 235, 50, 'left', 400, '#e9edef'));
 }
 
 function applyScale() {
