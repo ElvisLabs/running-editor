@@ -1,0 +1,973 @@
+<!doctype html>
+<html>
+<head>
+    <title>听力统计生成器</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=no viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no" />
+    <link href="https://dict.eudic.net/Content/css/dictbody.css?20240419" rel="stylesheet" />
+    <link rel="stylesheet" href="https://dict.eudic.net/Content/css/mobile/mobile.css?20240419" />
+    <link rel="stylesheet" type="text/css" href="https://dict.eudic.net/Content/css/ting/statisticsPage.css?_=081720250702">
+    <link rel="stylesheet" href="https://dict.eudic.net/Content/lib/weui/weui.min.css?20200224" />
+    <link rel="stylesheet" type="text/css" href="https://dict.eudic.net/Content/heatmap/calendar-heatmap.css?2023">
+<style>
+    .hint { font-size: 8px; color: #ccc; }
+    /* 原站用 JS 把 headinfo 上移半高实现与头像垂直居中，这里用 transform 等效 */
+    .headinfo { transform: translateY(-50%); }
+    /* 远程字体受 CORS 限制，本地文件打开时回退到 macOS 自带的 DIN Alternate */
+    @font-face {
+        font-family: dinalternatebold;
+        src: local('DIN Alternate Bold'), local('DINAlternate-Bold'), local('DIN Alternate');
+    }
+    #timePeriodPie { min-height: 430px; }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    #targetDuration.gen-show { display: inline !important; }
+    /* ===== 编辑面板（生成器自带，非原页面元素） ===== */
+    .gen-fab {
+        position: fixed; right: 12px; top: 40%; z-index: 20000;
+        width: 44px; height: 44px; border-radius: 50%; border: 0;
+        background: rgba(13,133,255,.92); color: #fff; font-size: 13px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer;
+    }
+    .gen-panel {
+        position: fixed; right: 0; top: 0; bottom: 0; width: 320px; max-width: 92vw;
+        background: #fff; z-index: 20001; box-shadow: -4px 0 24px rgba(0,0,0,.18);
+        transform: translateX(105%); transition: transform .25s ease;
+        display: flex; flex-direction: column; font-size: 13px; color: #333;
+    }
+    .gen-panel.show { transform: translateX(0); }
+    .gen-panel-head {
+        padding: 12px 16px; font-size: 15px; font-weight: 600;
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 1px solid #eee; flex-shrink: 0;
+    }
+    .gen-panel-head button { border: 0; background: none; font-size: 20px; color: #999; cursor: pointer; }
+    .gen-panel-body { overflow-y: auto; padding: 8px 16px 24px; -webkit-overflow-scrolling: touch; }
+    .gen-panel details { border-bottom: 1px solid #f0f0f0; padding: 6px 0; }
+    .gen-panel summary { font-weight: 600; padding: 6px 0; cursor: pointer; color: #0D85FF; }
+    .gen-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+    .gen-row label { flex-shrink: 0; color: #666; min-width: 72px; }
+    .gen-row input[type=text], .gen-row input[type=number], .gen-row input[type=date] {
+        flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font-size: 13px;
+    }
+    .gen-row input[type=number] { width: 70px; flex: 0 1 auto; }
+    .gen-btn {
+        border: 0; background: #0D85FF; color: #fff; border-radius: 6px;
+        padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    .gen-btn.gray { background: #aaa; }
+    .gen-btn.warn { background: #e35d5d; }
+    .gen-daylist { max-height: 260px; overflow-y: auto; border: 1px solid #f0f0f0; border-radius: 6px; margin: 8px 0; }
+    .gen-dayrow { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; border-bottom: 1px solid #f7f7f7; }
+    .gen-dayrow span { color: #666; }
+    .gen-dayrow input { width: 72px; border: 1px solid #ddd; border-radius: 5px; padding: 3px 6px; text-align: right; }
+    .gen-total { color: #0D85FF; font-weight: 600; }
+    .gen-tip { color: #999; font-size: 11px; margin: 4px 0; }
+    body.gen-capture .gen-fab, body.gen-capture .gen-panel { display: none !important; }
+</style>
+</head>
+<body class="en" data-lang="en">
+    <div class="user scale">
+        <dl class="person">
+            <div class="headinfo">
+                <h2 class="name" id="genName">ElvisDing</h2>
+                <p class="desc" id="genDesc">普通用户</p>
+            </div>
+            <dd class="avatar borderScale"><img id="genAvatar" src="https://api.frdic.com/api/v3/user/avatar/36f51d99-8fc7-11f1-811d-005056867387" /></dd>
+        </dl>
+    </div>
+    <div class="departLine"></div>
+    <div class="chartBox timeChartBox">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/tingtime.png">
+听力时长统计            <div class="chartToggle timeChartToggle">
+                <span class="chartTypeBtn" id="tingToggleBtn" data-type="column">曲线图</span>
+         </div>
+         </div>
+        <div class="sortPage" style="display:none"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
+        </div>
+        <div class="eudicStudyTime">
+            <div class="eudicTimeRange">
+                <ul class="timeUl timeSelectUl">
+                    <li class="sevenMonth seven_div dateBtn sevenDay activeDate" id="btn7">近7天</li>
+                    <li class="sevenMonth dateBtn" id="btn30">近30天</li>
+                </ul>
+                <span class="splitLine"></span>
+                <div class="calendarBox">
+                    <div class="selectDateBox">
+                        <span class="dateBtn startDate input_opacity1_span1">2026-08-11</span>
+                        <input type="date" class="dateInputStart date_input1" value="2026-08-11" min="2014-01-01" />
+                    </div>
+                    <span class="dateMid">至</span>
+                    <div class="selectDateBox">
+                        <span class="dateBtn endDate input_opacity1_span2">2026-08-17</span>
+                        <input type="date" class="dateInputEnd date_input2" value="2026-08-17" min="2014-01-02" />
+                    </div>
+                </div>
+            </div>
+            <div id="userChangeCalendar_div"></div>
+            <div class="listentoDateBox">
+                <img src="https://static.frdic.com/web/statistics/strawLeftNew.png">
+                <div class="listentoDate">
+                   <div class="totalTimeBox"><span id="curDaysDuration"></span><span id="playDuration"></span><span id="targetDuration"></span></div>
+                   <div class="totalTimeTip vipTip" id="totalTimeTip" style="display:none"></div>
+                </div>
+                <img src="https://static.frdic.com/web/statistics/strawRightNew.png">
+            </div>
+        </div>
+    </div>
+    <div class="departLine departLine1"></div>
+    <div class="chartBox signBox statisticsCalendar">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/calendarIcon.png">打卡统计</div>
+            <div class="checkDaysBox" id="checkDaysBox">连续打卡<span class="lightDay">0</span>天，累计打卡<span class="lightDay">0</span>天</div>
+        </div>
+        <div class="contentItem">
+            <div class="calendar" id="calendar" data-signtoday="false">
+                <dl class="dateItem">
+                    <dt class="monthData"><span class="fullyear"></span>年<span class="month"></span>月</dt>
+                    <dd class="direct pre"></dd>
+                    <dd class="direct next"></dd>
+                </dl>
+                <ul class="weeklist">
+                    <li>日</li><li>一</li><li>二</li><li>三</li><li>四</li><li>五</li><li>六</li>
+                </ul>
+                <div class="dayContainer">
+                    <ol class="daylist"></ol>
+                    <ol class="daylist"></ol>
+                </div>
+            </div>
+        </div>
+        <div class="addSignTip">
+            <p class="addSignTipTxt"><i>小提示：</i> 点击日期可以查看明细和补签哦~</p>
+        </div>
+    </div>
+    <div class="departLine departLine2"></div>
+    <div class="chartBox">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/dateIcon.png">日期统计</div>
+        </div>
+        <div id="heatmap" class="contentItem" style="overflow:scroll">
+            <div id="cal-heatmap-container"></div>
+        </div>
+    </div>
+    <div class="departLine departLine3"></div>
+    <div class="chartBox">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/tingSeven.png">近7天收听统计</div>
+        </div>
+        <div class="sevenDateBox">
+            <div id="tingTimePeriodBox" style="display:none;">
+                <div id="timePeriodPie"></div>
+            </div>
+            <div class="listentoDateBox listentoDateBoxNew">
+                <img src="https://static.frdic.com/web/statistics/strawLeftNew.png">
+                <div class="listentoDate">
+                    <p class="listenDate">收听了<span class="lightDay"><i class="listenTotal"></i>篇</span>文章，超越<span class="lightDay totalPercent"></span>的用户</p>
+                    <p class="listentoDateLine"></p>
+                </div>
+                <img src="https://static.frdic.com/web/statistics/strawRightNew.png">
+            </div>
+            <ul class="listentoMenu">
+                <li class="listentoMenuLi">
+                    <img class="listen1Icon" src="https://static.frdic.com/web/statistics/listen1IconNew.png">
+                    <div class="nemuTitle">最新资源</div>
+                    <div class="menuDetail">收听<span class="lightDay"><i id="channelTime1"></i><i id="channelUnit1">分钟</i></span>，占收听总时间的<span class="lightDay"><i id="channelPercent1"></i>%</span></div>
+                </li>
+                <li class="listentoMenuLi listentoMenuLi2">
+                    <img class="listen3Icon" src="https://static.frdic.com/web/statistics/listen3IconNew.png">
+                    <div class="nemuTitle">历史推荐</div>
+                    <div class="menuDetail">收听<span class="lightDay"><i id="channelTime2"></i><i id="channelUnit2">分钟</i></span>，占收听总时间的<span class="lightDay"><i id="channelPercent2"></i>%</span></div>
+                </li>
+                <li class="listentoMenuLi listentoMenuLi3">
+                    <img class="listen4Icon" src="https://static.frdic.com/web/statistics/listen4IconNew.png">
+                    <div class="nemuTitle">公开课</div>
+                    <div class="menuDetail">收听<span class="lightDay"><i id="channelTime3"></i><i id="channelUnit3">分钟</i></span>，占收听总时间的<span class="lightDay"><i id="channelPercent3"></i>%</span></div>
+                </li>
+                <li class="listentoMenuLi">
+                    <img class="listen2Icon" src="https://static.frdic.com/web/statistics/listen2IconNew.png">
+                    <div class="nemuTitle">四六级专题</div>
+                    <div class="menuDetail">收听<span class="lightDay"><i id="channelTime4"></i><i id="channelUnit4">分钟</i></span>，占收听总时间的<span class="lightDay"><i id="channelPercent4"></i>%</span></div>
+                </li>
+            </ul>
+            <p class="listentoMenuTip">*<i id="listentoMenuTip"></i>。</p>
+        </div>
+    </div>
+    <div class="departLine departLine4 dubbing_statistic"></div>
+    <div class="chartBox dubChartBox dubbing_statistic">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/dubIcon.png">跟读配音统计
+                <div class="chartToggle dubbingChartToggle">
+                    <span class="chartTypeBtn" id="dubToggleBtn" data-type="areaspline">柱状图</span>
+                </div>
+            </div>
+            <div class="dubSort" style="display:none"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
+        </div>
+        <div class="eudicStudyTime">
+            <div class="eudicTimeRange">
+                <ul class="timeUl timeSelectUl">
+                    <li class="dubSevenMonth seven_div dateBtn sevenDay dubActiveDate">近7天</li>
+                    <li class="dubSevenMonth dateBtn">近30天</li>
+                </ul>
+            </div>
+            <div id="userDubbingCalendar"></div>
+            <div class="listentoDateBox listentoDateBoxNew">
+                <img src="https://static.frdic.com/web/statistics/strawLeftNew.png">
+                <div class="listentoDate">
+                    <p class="listenDate">近<i id="dubSelectDay">7</i>天跟读配音<span class="lightDay"><i class="dub_listenTotal">0</i>个</span>作品，超越<span class="lightDay dub_totalPercent">0%</span>的用户</p>
+                    <p class="listentoDateLine"></p>
+                </div>
+                <img src="https://static.frdic.com/web/statistics/strawRightNew.png">
+            </div>
+        </div>
+        <div class="dubSevenBox">
+            <p class="sevenListUlTitle">跟读配音总数据</p>
+            <ul class="sevenListUl">
+                <li class="sevenListLi"><p class="sevenListNum" id="ting_dub_play">0</p><p class="sevenListName">播放量</p></li>
+                <li class="sevenListLi"><p class="sevenListNum" id="ting_dub_zan">0</p><p class="sevenListName">收获点赞</p></li>
+                <li class="sevenListLi"><p class="sevenListNum" id="ting_dub_article">0</p><p class="sevenListName">作品数</p></li>
+                <li class="sevenListLi"><p class="sevenListNum" id="ting_dub_time">0</p><p class="sevenListName" id="ting_dub_time_title">时长(分钟)</p></li>
+            </ul>
+        </div>
+    </div>
+    <div class="departLine departLine5"></div>
+    <div class="chartBox wordChartBox">
+        <div class="chartTitleBox">
+            <div class="chartTitle"><img src="https://static.frdic.com/web/statistics/wordIcon.png">近7天词汇统计</div>
+        </div>
+        <ul class="sevenListUl">
+            <li class="sevenListLi"><p class="sevenListNum" id="word1">0</p><p class="sevenListName">查询单词</p></li>
+            <li class="sevenListLi"><p class="sevenListNum" id="word2">0</p><p class="sevenListName">接触词汇</p></li>
+            <li class="sevenListLi"><p class="sevenListNum" id="word3">0</p><p class="sevenListName">收藏文章</p></li>
+            <li class="sevenListLi"><p class="sevenListNum" id="word4">0</p><p class="sevenListName">加入生词本</p></li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="shareDiv shareDiv2">
+            <div id="weichat">
+                <img src="https://static.eudic.net/img/crcode_en.png" class="weicrcode" />
+            </div>
+            <div id="shareme"><a href="https://www.eudic.net/v4/en/app/ting" class="share"><div class="shareinfo">下载「每日英语听力」</div></a></div>
+        </div>
+    </div>
+
+    <div class="adaptationIphone"></div>
+    <footer class="center">
+        <div>欧路软件 欧路词典 &copy;2026     <div class="view-switcher ui-bar-a">
+            <span>手机版 | </span><a href="#" rel="external">桌面版</a></div>
+        </div>
+    </footer>
+
+    <!-- ===== 编辑面板 ===== -->
+    <button class="gen-fab" id="genFab">编辑</button>
+    <div class="gen-panel" id="genPanel">
+        <div class="gen-panel-head">统计数据编辑<button id="genClose">×</button></div>
+        <div class="gen-panel-body">
+            <details open>
+                <summary>基本信息</summary>
+                <div class="gen-row"><label>昵称</label><input type="text" id="inName"></div>
+                <div class="gen-row"><label>描述</label><input type="text" id="inDesc"></div>
+                <div class="gen-row"><label>头像URL</label><input type="text" id="inAvatar"></div>
+                <div class="gen-row"><label>本地上传</label><input type="file" id="inAvatarFile" accept="image/*" style="flex:1;min-width:0"></div>
+                <div class="gen-tip">也可以直接点页面上的头像换图；本地图片会压缩后存在浏览器里。</div>
+            </details>
+            <details open>
+                <summary>时间范围与每日时长</summary>
+                <div class="gen-row"><label>开始日期</label><input type="date" id="inStart"></div>
+                <div class="gen-row"><label>结束日期</label><input type="date" id="inEnd"></div>
+                <div class="gen-row"><label>总时长</label>
+                    <input type="number" id="inTotalH" min="0" style="width:60px">小时
+                    <input type="number" id="inTotalM" min="0" max="59" style="width:60px">分钟
+                </div>
+                <div class="gen-row">
+                    <button class="gen-btn" id="btnEven">均匀分配</button>
+                    <button class="gen-btn" id="btnRandom">随机分配</button>
+                    <button class="gen-btn gray" id="btnZero">范围清零</button>
+                </div>
+                <div class="gen-tip">先填总时长再点分配，会把时间摊到范围内每一天；下面也可以逐天手动改。</div>
+                <div class="gen-daylist" id="genDayList"></div>
+                <div class="gen-tip">当前范围合计：<span class="gen-total" id="genRangeTotal"></span></div>
+            </details>
+            <details>
+                <summary>打卡与年度数据</summary>
+                <div class="gen-row"><label>目标时长</label><input type="number" id="inTarget" min="0">分钟</div>
+                <div class="gen-row"><label>显示目标</label><input type="checkbox" id="inShowTarget" style="flex:0">在时长文案中显示目标</div>
+                <div class="gen-row"><label>连续打卡</label><input type="text" id="inStreak" placeholder="留空=自动"></div>
+                <div class="gen-row"><label>累计打卡</label><input type="text" id="inTotalSign" placeholder="留空=自动"></div>
+                <div class="gen-row"><label>近一年时长</label><input type="text" id="inYearHours" placeholder="小时，留空=自动"></div>
+                <div class="gen-tip">打卡规则：当天听力分钟数 ≥ 目标时长即打卡；日历上点某天可补签/取消。</div>
+                <div class="gen-row"><label>年度填充</label>活跃率<input type="number" id="inFillRate" min="0" max="100" style="width:52px">%</div>
+                <div class="gen-row"><label>每日区间</label><input type="number" id="inFillMin" min="0" style="width:52px">~<input type="number" id="inFillMax" min="1" style="width:52px">分钟</div>
+                <div class="gen-row">
+                    <button class="gen-btn" id="btnFillYear">随机填充过去一年</button>
+                    <button class="gen-btn warn" id="btnClearAll">清空全部数据</button>
+                </div>
+            </details>
+            <details>
+                <summary>近7天收听统计</summary>
+                <div class="gen-row"><label>文章篇数</label><input type="number" id="inArticle" min="0"></div>
+                <div class="gen-row"><label>超越用户</label><input type="number" id="inRank" min="0" max="100" step="0.1">%</div>
+                <div class="gen-row"><label>最新资源</label><input type="number" id="inCh1" min="0">分钟</div>
+                <div class="gen-row"><label>历史推荐</label><input type="number" id="inCh2" min="0">分钟</div>
+                <div class="gen-row"><label>公开课</label><input type="number" id="inCh3" min="0">分钟</div>
+                <div class="gen-row"><label>四六级</label><input type="number" id="inCh4" min="0">分钟</div>
+                <div class="gen-row"><label>底部备注</label><input type="text" id="inChTip"></div>
+                <div class="gen-tip">时段占比（分钟，全 0 则隐藏饼图）：</div>
+                <div class="gen-row"><label>早上6-9</label><input type="number" id="inP0" min="0"></div>
+                <div class="gen-row"><label>上午9-12</label><input type="number" id="inP1" min="0"></div>
+                <div class="gen-row"><label>下午12-18</label><input type="number" id="inP2" min="0"></div>
+                <div class="gen-row"><label>晚上18-24</label><input type="number" id="inP3" min="0"></div>
+                <div class="gen-row"><label>深夜0-6</label><input type="number" id="inP4" min="0"></div>
+            </details>
+            <details>
+                <summary>跟读配音统计</summary>
+                <div class="gen-row"><label>每日作品</label><input type="text" id="inDubDaily" placeholder="7个数字，逗号分隔"></div>
+                <div class="gen-row"><label>超越用户</label><input type="number" id="inDubPercent" min="0" max="100" step="0.1">%</div>
+                <div class="gen-row"><label>播放量</label><input type="number" id="inDubPlay" min="0"></div>
+                <div class="gen-row"><label>收获点赞</label><input type="number" id="inDubZan" min="0"></div>
+                <div class="gen-row"><label>作品数</label><input type="number" id="inDubArticle" min="0"></div>
+                <div class="gen-row"><label>时长(分钟)</label><input type="number" id="inDubTime" min="0"></div>
+            </details>
+            <details>
+                <summary>近7天词汇统计</summary>
+                <div class="gen-row"><label>查询单词</label><input type="number" id="inW1" min="0"></div>
+                <div class="gen-row"><label>接触词汇</label><input type="number" id="inW2" min="0"></div>
+                <div class="gen-row"><label>收藏文章</label><input type="number" id="inW3" min="0"></div>
+                <div class="gen-row"><label>加入生词本</label><input type="number" id="inW4" min="0"></div>
+            </details>
+            <div class="gen-row" style="margin-top:14px">
+                <button class="gen-btn gray" id="btnCapture">截图模式(隐藏按钮10秒)</button>
+                <button class="gen-btn warn" id="btnReset">恢复默认</button>
+            </div>
+            <div class="gen-tip">数据自动保存在浏览器本地(localStorage)，刷新不丢失。</div>
+        </div>
+    </div>
+
+    <script src="https://dict.eudic.net/Scripts/highcharts.js"></script>
+    <script src="https://dict.eudic.net/Content/heatmap/moment.min.js" charset="utf-8"></script>
+    <script src="https://dict.eudic.net/Content/heatmap/d3.v4.min.js" charset="utf-8"></script>
+    <script src="https://dict.eudic.net/Content/heatmap/calendar-heatmap.js?20230227"></script>
+    <script>
+    /* 与原站一致的 rem 缩放 */
+    (function (d, w) {
+        var el = d.documentElement;
+        function resize() {
+            var n = el.clientWidth || 640;
+            el.style.fontSize = n >= 840 ? '150px' : n >= 640 ? '100px' : (100 * n / 640) + 'px';
+        }
+        w.addEventListener('resize', resize);
+        resize();
+    })(document, window);
+    function getClientHeight() { return 178; }
+
+    var STORE_KEY = 'eudicTingStatsGen.v1';
+    var $ = function (s) { return document.querySelector(s); };
+    var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function fmt(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function parseD(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    function addDays(d, n) { var t = new Date(d); t.setDate(t.getDate() + n); return t; }
+    function todayStr() { return fmt(new Date()); }
+    var WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+    /* ---------- 状态 ---------- */
+    var state = null;
+    function defaultState() {
+        var end = new Date();
+        var s = {
+            name: 'ElvisDing', desc: '普通用户',
+            avatar: 'https://api.frdic.com/api/v3/user/avatar/36f51d99-8fc7-11f1-811d-005056867387',
+            quick: '7', rangeStart: fmt(addDays(end, -6)), rangeEnd: fmt(end),
+            chartType: 'column',
+            days: {}, target: 15, yearHours: '', streakOv: '', totalOv: '',
+            articleCount: 18, rankPercent: 67.2,
+            channels: [46, 20, 12, 8], channelTip: '以上为近7天各栏目的收听时长统计',
+            period: [30, 120, 260, 380, 146],
+            dubDaily: [0, 0, 0, 0, 0, 0, 0], dubPercent: 0, dubPlay: 0, dubZan: 0, dubArticle: 0, dubTime: 0,
+            words: [45, 230, 3, 12],
+            fillRate: 55, fillMin: 5, fillMax: 95
+        };
+        for (var i = 364; i >= 7; i--) {
+            if (Math.random() < 0.55) s.days[fmt(addDays(end, -i))] = 5 + Math.floor(Math.random() * 90);
+        }
+        var last7 = [141, 127, 168, 109, 152, 133, 106];
+        for (var j = 0; j < 7; j++) s.days[fmt(addDays(end, j - 6))] = last7[j];
+        return s;
+    }
+    function load() {
+        try {
+            var raw = localStorage.getItem(STORE_KEY);
+            if (raw) {
+                state = JSON.parse(raw);
+                if (state.quick === '7') { state.rangeEnd = todayStr(); state.rangeStart = fmt(addDays(new Date(), -6)); }
+                if (state.quick === '30') { state.rangeEnd = todayStr(); state.rangeStart = fmt(addDays(new Date(), -29)); }
+                return;
+            }
+        } catch (e) { }
+        state = defaultState();
+        save();
+    }
+    var saveTimer;
+    function save() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }, 250);
+    }
+
+    function rangeDates() {
+        var out = [], d = parseD(state.rangeStart), end = parseD(state.rangeEnd);
+        if (d > end) { var t = d; d = end; end = t; }
+        var guard = 0;
+        while (d <= end && guard++ < 370) { out.push(fmt(d)); d = addDays(d, 1); }
+        return out;
+    }
+    function minutesOf(ds) { return Math.max(0, Math.floor(state.days[ds] || 0)); }
+    function signedOn(ds) { return minutesOf(ds) >= Math.max(1, state.target || 1); }
+
+    /* ---------- 听力时长图（配置与原站一致） ---------- */
+    var gDD = [], gCats = [];
+    var commonConfig = {
+        chart: { spacingBottom: 0, height: 300, style: { fontFamily: "'Unica One', sans-serif" } },
+        title: { text: '' }, legend: { enabled: false },
+        xAxis: {
+            tickLength: 0, crosshair: { width: 1, color: '#0D84FE', dashStyle: 'shortDash' },
+            tickmarkPlacement: 'on', categories: [],
+            labels: { rotation: -45, style: { color: '#97979e', fontSize: '10px' } }
+        },
+        yAxis: {
+            title: { text: '' }, labels: { style: { color: '#97979e', fontSize: '10px' } },
+            gridLineDashStyle: 'longdash', gridLineWidth: 0.5, min: 0
+        },
+        tooltip: {
+            backgroundColor: '#ffffff', borderWidth: 0, borderRadius: 6, shadow: true,
+            valueSuffix: '分钟', useHTML: true,
+            formatter: function () {
+                return '<span class="chartGoalTitle">' + (gDD[this.point.index] || '') + '收听时长</span><br/><span class="chartGoalBox"><i class="chartGoal"> ' + this.y + ' </i>分钟</span>';
+            }
+        },
+        credits: { enabled: false },
+        series: [{ name: '听力统计', data: [] }]
+    };
+    var columnConfig = {
+        chart: { type: 'column' }, yAxis: { maxPadding: 0.1 },
+        plotOptions: {
+            column: {
+                color: '#0D85FF', pointWidth: 8, borderWidth: 0, pointPadding: 0.1, groupPadding: 0.1,
+                dataLabels: {
+                    enabled: true, color: '#0D85FF', y: 2,
+                    style: { fontSize: '10px', textOutline: 'none' },
+                    formatter: function () { return this.y + ' 分钟'; }
+                }
+            },
+            series: { pointPlacement: null, shadow: false }
+        }
+    };
+    var areasplineConfig = {
+        chart: { type: 'areaspline' },
+        plotOptions: {
+            area: { fillOpacity: 0.5, lineWidth: 2, marker: { radius: 2, states: { hover: { lineWidth: 1 }, select: { enabled: false, lineWidth: 1 } } } },
+            series: {
+                shadow: false, pointPlacement: 'on',
+                fillColor: { linearGradient: [0, 0, 0, 300], stops: [[0, 'rgba(13,133,255,0.2)'], [1, 'rgba(13,133,255,0)']] },
+                marker: { enabled: false }, color: '#0D85FF', lineWidth: 1
+            }
+        }
+    };
+    var chart = Highcharts.chart('userChangeCalendar_div', Highcharts.merge(true, {}, commonConfig, columnConfig));
+
+    function lastTooltip(c) {
+        setTimeout(function () {
+            var s = c.series[0]; if (!s || !s.points.length) return;
+            c.tooltip.shared = false;
+            c.tooltip.refresh(s.points[s.points.length - 1]);
+        }, 1200);
+    }
+
+    function renderTingChart() {
+        var dates = rangeDates();
+        gDD = dates;
+        var data = dates.map(minutesOf);
+        if (dates.length === 7) {
+            gCats = dates.map(function (ds) { return WEEK[parseD(ds).getDay()]; });
+        } else {
+            gCats = dates.map(function (ds) { var p = ds.split('-'); return (+p[1]) + '-' + (+p[2]); });
+        }
+        while (chart.series.length) chart.series[0].remove(false);
+        var total = data.reduce(function (a, b) { return a + b; }, 0);
+        if (total === 0) { chart.yAxis[0].update({ min: 0, minRange: 40 }, false); }
+        else { chart.yAxis[0].update({ minRange: 0 }, false); }
+        chart.xAxis[0].setCategories(gCats, false);
+        chart.addSeries({ name: '听力统计', data: data });
+        lastTooltip(chart);
+        var label = state.quick === '7' ? '近7天' : state.quick === '30' ? '近30天' : '该时段内';
+        $('#curDaysDuration').innerHTML = label + '收听<span class="lightDay">' + Math.floor(total / 60) + '小时' + (total % 60) + '分钟</span>，';
+        var yh = state.yearHours !== '' ? state.yearHours : (function () {
+            var sum = 0, t = new Date();
+            for (var i = 0; i < 365; i++) sum += minutesOf(fmt(addDays(t, -i)));
+            return (sum / 60).toFixed(1);
+        })();
+        $('#playDuration').innerHTML = '近一年时长为<span class="lightDay">' + yh + '小时</span>';
+        var tgt = $('#targetDuration');
+        if (state.showTarget && state.target > 0) {
+            tgt.className = 'gen-show';
+            tgt.innerHTML = '，打卡目标时长 <span class="lightDay">' + state.target + '分钟</span>';
+        } else { tgt.className = ''; tgt.innerHTML = ''; }
+        $('.input_opacity1_span1').textContent = state.rangeStart;
+        $('.input_opacity1_span2').textContent = state.rangeEnd;
+        $('.date_input1').value = state.rangeStart;
+        $('.date_input2').value = state.rangeEnd;
+    }
+
+    function setTingType(type) {
+        state.chartType = type; save();
+        var btn = $('#tingToggleBtn');
+        btn.dataset.type = type;
+        btn.textContent = type === 'column' ? '曲线图' : '柱状图';
+        chart.update(Highcharts.merge(true, {}, commonConfig, type === 'column' ? columnConfig : areasplineConfig), false);
+        renderTingChart();
+    }
+
+    /* ---------- 打卡日历 ---------- */
+    var view = { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+    function earliestDataYM() {
+        var min = null;
+        for (var k in state.days) if (state.days[k] > 0 && (!min || k < min)) min = k;
+        if (!min) return { y: view.y, m: view.m };
+        return { y: +min.slice(0, 4), m: +min.slice(5, 7) };
+    }
+    function renderCalendar() {
+        var y = view.y, m = view.m;
+        $('#calendar .fullyear').textContent = y;
+        $('#calendar .dateItem .month').textContent = m;
+        var days = new Date(y, m, 0).getDate();
+        var before = new Date(y, m - 1, 1).getDay();
+        var prevDays = new Date(y, m - 1, 0).getDate();
+        var cells = Math.ceil((before + days) / 7) * 7;
+        var now = new Date(), curY = now.getFullYear(), curM = now.getMonth() + 1, curD = now.getDate();
+        var isCurMonth = (y === curY && m === curM);
+        var html = '', i, ds;
+        var viewIsPast = (y < curY) || (y === curY && m < curM);
+        var pm = m === 1 ? 12 : m - 1, pmy = m === 1 ? y - 1 : y;
+        for (i = before - 1; i > -1; i--) {
+            html += '<li><span data-day="' + pmy + '-' + pm + '-' + (prevDays - i) + '" class="borderScale unmonth unmonthPre unsign">' + (prevDays - i) + '</span></li>';
+        }
+        for (i = 1; i <= days; i++) {
+            ds = y + '-' + pad(m) + '-' + pad(i);
+            var cls = 'borderScale monthData';
+            var isFuture = isCurMonth && i > curD;
+            if (!isFuture && !(y > curY || (y === curY && m > curM))) {
+                cls += signedOn(ds) ? ' sign' : ' unsign';
+            }
+            if (isCurMonth && i === curD) cls += ' cur';
+            html += '<li class="curMonthLi"><span data-day="' + ds + '" class="' + cls + '">' + i + '</span></li>';
+        }
+        var nm = m === 12 ? 1 : m + 1, nmy = m === 12 ? y + 1 : y;
+        for (i = 1; i <= cells - before - days; i++) {
+            html += '<li><span data-day="' + nmy + '-' + nm + '-' + i + '" class="borderScale unmonth unmonthNext' + (viewIsPast ? ' unsign' : '') + '">' + i + '</span></li>';
+        }
+        var lists = $$('#calendar .daylist');
+        lists[0].innerHTML = '';
+        lists[1].innerHTML = html;
+        $('#calendar .next').style.display = isCurMonth ? 'none' : 'block';
+        var o = earliestDataYM();
+        $('#calendar .pre').style.display = (y < o.y || (y === o.y && m <= o.m)) ? 'none' : 'block';
+        renderCheckCounts();
+    }
+    function renderCheckCounts() {
+        var streak, total;
+        if (state.streakOv !== '') { streak = state.streakOv; }
+        else {
+            streak = 0;
+            var d = new Date();
+            if (!signedOn(fmt(d))) d = addDays(d, -1);
+            while (signedOn(fmt(d))) { streak++; d = addDays(d, -1); }
+        }
+        if (state.totalOv !== '') { total = state.totalOv; }
+        else {
+            total = 0;
+            for (var k in state.days) if (signedOn(k)) total++;
+        }
+        $('#checkDaysBox').innerHTML = '连续打卡<span class="lightDay">' + streak + '</span>天，累计打卡<span class="lightDay">' + total + '</span>天';
+    }
+
+    /* ---------- 日期统计热力图 ---------- */
+    var heatTimer;
+    function renderHeatmap() {
+        clearTimeout(heatTimer);
+        heatTimer = setTimeout(function () {
+            var box = $('#cal-heatmap-container');
+            box.innerHTML = '';
+            var data = [], t = new Date();
+            for (var i = 364; i >= 0; i--) {
+                var d = addDays(t, -i);
+                data.push({ date: d, count: minutesOf(fmt(d)) });
+            }
+            var locale = { months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], days: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], No: 'No', on: 'on', Less: 'Less', More: 'More' };
+            try {
+                var hm = calendarHeatmap().data(data).selector('#cal-heatmap-container')
+                    .colorRange(['#F0F0F0', '#0D85FF']).tooltipEnabled(false).legendEnabled(true)
+                    .onClick(function () { }).locale(locale);
+                hm();
+                $('#heatmap').scrollTo(1150, 0);
+            } catch (e) { console.log('heatmap error', e); }
+        }, 350);
+    }
+
+    /* ---------- 近7天收听统计 ---------- */
+    var timePeriodColors = ['#FB902E', '#5DD08D', '#477CFF', '#C871F6', '#5F6364'];
+    var pieChart = null;
+    function updateCenterText(c, p) {
+        var name, pct;
+        if (c.centerText) c.centerText.destroy();
+        if (c.centerText2) c.centerText2.destroy();
+        if (p) { name = p.name; pct = p.percentage.toFixed(0) + '%'; }
+        var x = c.plotWidth / 2 + c.plotLeft, y = c.plotHeight / 2 + c.plotTop;
+        c.centerText = c.renderer.text(pct || '', x, y - 10).attr({ fill: '#202124', 'font-size': '20px', 'font-weight': 'bold', 'text-anchor': 'middle', 'pointer-events': 'none' }).add();
+        c.centerText2 = c.renderer.text(name || '', x, y + 15).attr({ 'text-anchor': 'middle', fill: '#93979e', 'pointer-events': 'none' }).add();
+    }
+    function pieShowMax(c) {
+        if (c && c.series.length && c.series[0].points.length) {
+            var pts = c.series[0].points, top = pts[0];
+            pts.forEach(function (p) { if (p.percentage > top.percentage) top = p; });
+            c.tooltip.refresh(top);
+            updateCenterText(c, top);
+        }
+    }
+    function pieConfig(name, data) {
+        return {
+            chart: { type: 'pie', events: { load: function () { var c = this; updateCenterText(c); setTimeout(function () { pieShowMax(c); }, 1500); } } },
+            title: { text: '' },
+            tooltip: {
+                useHTML: true, outside: true, pointFormat: '{series.name}: <b>{point.percentage:.0f}%</b>', shared: false,
+                positioner: function (w, h) {
+                    var c = this.chart, x = c.plotLeft + c.plotWidth + 10, y = c.plotTop + c.plotHeight - h - 10;
+                    x = Math.max(10, Math.min(x, c.chartWidth - w - 10));
+                    y = Math.max(10, Math.min(y, c.chartHeight - h - 10));
+                    return { x: x, y: y };
+                }
+            },
+            credits: { enabled: false },
+            legend: { enabled: true, layout: 'horizontal', align: 'center', verticalAlign: 'bottom', itemStyle: { fontSize: '12px', color: '#333' }, itemWidth: 150, itemMarginTop: 5, itemMarginBottom: 5 },
+            colors: timePeriodColors,
+            plotOptions: {
+                pie: { size: '70%', innerSize: '65%', point: { events: { legendItemClick: function () { return false; }, select: function () { updateCenterText(this.series.chart, this); } } } },
+                series: { allowPointSelect: true, cursor: 'pointer', borderRadius: 8, dataLabels: [{ enabled: true, distance: 20, format: '{point.name}' }, { enabled: true, distance: -15, format: '{point.percentage:.0f}%', style: { fontSize: '0.9em' } }], showInLegend: true }
+            },
+            series: [{ name: name, colorByPoint: true, data: data }]
+        };
+    }
+    function calcPercent(arr) {
+        var sum = arr.reduce(function (a, b) { return a + b; }, 0);
+        if (sum <= 0) return arr.map(function (_, i) { return i === 0 ? 100 : 0; });
+        var out = arr.map(function (v) { return Math.round(v / sum * 100); });
+        var head = out.slice(0, -1).reduce(function (a, b) { return a + b; }, 0);
+        out[out.length - 1] = 100 - head;
+        return out;
+    }
+    function renderSeven() {
+        $('.listenTotal').textContent = state.articleCount;
+        $('.totalPercent').textContent = Number(state.rankPercent).toFixed(1) + '%';
+        var ch = state.channels.map(Number);
+        var sum = ch.reduce(function (a, b) { return a + b; }, 0);
+        for (var i = 0; i < 4; i++) {
+            $('#channelTime' + (i + 1)).textContent = Math.round(ch[i]);
+            $('#channelPercent' + (i + 1)).textContent = sum > 0 ? Math.round(ch[i] / sum * 100) : 0;
+        }
+        $('#listentoMenuTip').textContent = state.channelTip;
+        var pd = state.period.map(Number);
+        var pSum = pd.reduce(function (a, b) { return a + b; }, 0);
+        var box = $('#tingTimePeriodBox');
+        if (pSum > 0) {
+            box.style.display = 'block';
+            var pct = calcPercent(pd);
+            var names = ['早上（6-9点）', '上午（9-12点）', '下午（12-18点）', '晚上（18-24点）', '深夜（0-6点）'];
+            var data = names.map(function (n, i) { return { name: n, y: pct[i] }; });
+            if (!pieChart) pieChart = Highcharts.chart('timePeriodPie', pieConfig('收听占比', data));
+            else { pieChart.series[0].setData(data); setTimeout(function () { pieShowMax(pieChart); }, 300); }
+        } else {
+            box.style.display = 'none';
+        }
+    }
+
+    /* ---------- 跟读配音 ---------- */
+    var dubDD = [];
+    var dubCommon = Highcharts.merge(true, {}, commonConfig, {
+        tooltip: {
+            formatter: function () {
+                return '<span class="chartGoalTitle">' + (dubDD[this.point.index] || '') + '作品数</span><br/><span class="chartGoalBox"><i class="chartGoal"> ' + this.y + ' </i>个</span>';
+            }
+        },
+        series: [{ name: '配音统计', data: [] }]
+    });
+    var dubAreaspline = Highcharts.merge(true, {}, areasplineConfig);
+    var dubColumn = Highcharts.merge(true, {}, columnConfig, {
+        plotOptions: { column: { dataLabels: { formatter: function () { return this.y + ' 个'; } } } }
+    });
+    var dubChart = Highcharts.chart('userDubbingCalendar', Highcharts.merge(true, {}, dubCommon, dubAreaspline));
+    function renderDub() {
+        var t = new Date(), dates = [];
+        for (var i = 6; i >= 0; i--) dates.push(fmt(addDays(t, -i)));
+        dubDD = dates;
+        var cats = dates.map(function (ds) { return WEEK[parseD(ds).getDay()]; });
+        var data = state.dubDaily.map(Number).slice(0, 7);
+        while (data.length < 7) data.push(0);
+        while (dubChart.series.length) dubChart.series[0].remove(false);
+        var total = data.reduce(function (a, b) { return a + b; }, 0);
+        if (total === 0) dubChart.yAxis[0].update({ min: 0, minRange: 40 }, false);
+        else dubChart.yAxis[0].update({ minRange: 0 }, false);
+        dubChart.xAxis[0].setCategories(cats, false);
+        dubChart.addSeries({ name: '配音统计', data: data });
+        $('.dub_listenTotal').textContent = total;
+        $('.dub_totalPercent').textContent = Number(state.dubPercent).toFixed(1) + '%';
+        $('#ting_dub_play').textContent = state.dubPlay;
+        $('#ting_dub_zan').textContent = state.dubZan;
+        $('#ting_dub_article').textContent = state.dubArticle;
+        $('#ting_dub_time').textContent = state.dubTime;
+    }
+    $('#dubToggleBtn').addEventListener('click', function () {
+        var cur = this.dataset.type, next = cur === 'column' ? 'areaspline' : 'column';
+        this.dataset.type = next;
+        this.textContent = next === 'column' ? '曲线图' : '柱状图';
+        dubChart.update(Highcharts.merge(true, {}, dubCommon, next === 'column' ? dubColumn : dubAreaspline), false);
+        renderDub();
+    });
+
+    /* ---------- 词汇 / 头部 ---------- */
+    function renderMisc() {
+        $('#genName').textContent = state.name;
+        $('#genDesc').textContent = state.desc;
+        $('#genAvatar').src = state.avatar;
+        document.title = state.name + '的听力统计';
+        for (var i = 0; i < 4; i++) $('#word' + (i + 1)).textContent = state.words[i];
+    }
+
+    /* ---------- 每日时长编辑器 ---------- */
+    function renderDayEditor() {
+        var dates = rangeDates();
+        var box = $('#genDayList');
+        var html = '';
+        dates.forEach(function (ds) {
+            var d = parseD(ds);
+            html += '<div class="gen-dayrow"><span>' + ds.slice(5) + ' ' + WEEK[d.getDay()] + '</span>' +
+                '<input type="number" min="0" data-day="' + ds + '" value="' + minutesOf(ds) + '"></div>';
+        });
+        box.innerHTML = html;
+        $$('#genDayList input').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                state.days[this.dataset.day] = Math.max(0, Math.floor(+this.value || 0));
+                save();
+                refreshAfterDayChange(false);
+            });
+        });
+        updateRangeTotal();
+    }
+    function updateRangeTotal() {
+        var total = rangeDates().reduce(function (a, ds) { return a + minutesOf(ds); }, 0);
+        $('#genRangeTotal').textContent = Math.floor(total / 60) + '小时' + (total % 60) + '分钟（' + total + '分钟）';
+        $('#inTotalH').value = Math.floor(total / 60);
+        $('#inTotalM').value = total % 60;
+    }
+    function refreshAfterDayChange(rebuildEditor) {
+        renderTingChart();
+        renderCalendar();
+        renderHeatmap();
+        updateRangeTotal();
+        if (rebuildEditor) renderDayEditor();
+    }
+    function distribute(random) {
+        var total = Math.max(0, (+$('#inTotalH').value || 0) * 60 + (+$('#inTotalM').value || 0));
+        var dates = rangeDates(), n = dates.length;
+        var alloc;
+        if (!random) {
+            var base = Math.floor(total / n), rem = total - base * n;
+            alloc = dates.map(function (_, i) { return base + (i < rem ? 1 : 0); });
+        } else {
+            var w = dates.map(function () { return 0.35 + Math.random(); });
+            var ws = w.reduce(function (a, b) { return a + b; }, 0);
+            alloc = w.map(function (x) { return Math.floor(total * x / ws); });
+            var diff = total - alloc.reduce(function (a, b) { return a + b; }, 0);
+            for (var i = 0; diff > 0; i = (i + 1) % n) { alloc[i]++; diff--; }
+        }
+        dates.forEach(function (ds, i) { state.days[ds] = alloc[i]; });
+        save();
+        refreshAfterDayChange(true);
+    }
+
+    /* ---------- 页面原生控件 ---------- */
+    function setQuick(days) {
+        state.quick = days === 7 ? '7' : '30';
+        state.rangeEnd = todayStr();
+        state.rangeStart = fmt(addDays(new Date(), -(days - 1)));
+        save();
+        $('#btn7').classList.toggle('activeDate', days === 7);
+        $('#btn30').classList.toggle('activeDate', days === 30);
+        $$('.selectDateBox .dateBtn').forEach(function (e) { e.classList.remove('activeDate'); });
+        $('#inStart').value = state.rangeStart;
+        $('#inEnd').value = state.rangeEnd;
+        refreshAfterDayChange(true);
+    }
+    $('#btn7').addEventListener('click', function () { setQuick(7); });
+    $('#btn30').addEventListener('click', function () { setQuick(30); });
+    function setCustomRange(s, e) {
+        if (!s || !e) return;
+        if (parseD(s) > parseD(e)) { var t = s; s = e; e = t; }
+        state.quick = ''; state.rangeStart = s; state.rangeEnd = e;
+        save();
+        $('#btn7').classList.remove('activeDate');
+        $('#btn30').classList.remove('activeDate');
+        $$('.selectDateBox .dateBtn').forEach(function (el) { el.classList.add('activeDate'); });
+        $('#inStart').value = s; $('#inEnd').value = e;
+        refreshAfterDayChange(true);
+    }
+    $('.date_input1').addEventListener('change', function () { setCustomRange(this.value, $('.date_input2').value); });
+    $('.date_input2').addEventListener('change', function () { setCustomRange($('.date_input1').value, this.value); });
+    $('#tingToggleBtn').addEventListener('click', function () {
+        setTingType(this.dataset.type === 'column' ? 'areaspline' : 'column');
+    });
+    $('#calendar .pre').addEventListener('click', function () {
+        view.m--; if (view.m < 1) { view.m = 12; view.y--; }
+        renderCalendar();
+    });
+    $('#calendar .next').addEventListener('click', function () {
+        view.m++; if (view.m > 12) { view.m = 1; view.y++; }
+        renderCalendar();
+    });
+    $('#calendar').addEventListener('click', function (e) {
+        var sp = e.target.closest('span.monthData.borderScale');
+        if (!sp || !sp.dataset.day) return;
+        if (!sp.classList.contains('sign') && !sp.classList.contains('unsign')) return;
+        var ds = sp.dataset.day;
+        state.days[ds] = signedOn(ds) ? 0 : Math.max(15, state.target || 15);
+        save();
+        refreshAfterDayChange(true);
+    });
+
+    /* ---------- 头像本地上传 ---------- */
+    function setAvatarFromFile(file) {
+        if (!file || !file.type || file.type.indexOf('image') !== 0) return;
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        img.onload = function () {
+            var S = 240, c = document.createElement('canvas');
+            c.width = S; c.height = S;
+            var ctx = c.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, S, S);
+            var m = Math.min(img.width, img.height);
+            ctx.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, S, S);
+            URL.revokeObjectURL(url);
+            state.avatar = c.toDataURL('image/jpeg', 0.88);
+            save();
+            renderMisc();
+            var inp = $('#inAvatar');
+            inp.value = '';
+            inp.placeholder = '已使用本地上传的图片';
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); alert('图片读取失败'); };
+        img.src = url;
+    }
+
+    /* ---------- 编辑面板绑定 ---------- */
+    function bind(id, get, apply) {
+        var el = $(id);
+        el.value = get();
+        el.addEventListener('input', function () { apply(el.value); save(); });
+    }
+    function initPanel() {
+        bind('#inName', function () { return state.name; }, function (v) { state.name = v; renderMisc(); });
+        bind('#inDesc', function () { return state.desc; }, function (v) { state.desc = v; renderMisc(); });
+        var avEl = $('#inAvatar');
+        if (state.avatar.slice(0, 5) === 'data:') { avEl.value = ''; avEl.placeholder = '已使用本地上传的图片'; }
+        else { avEl.value = state.avatar; }
+        avEl.addEventListener('input', function () {
+            if (avEl.value.trim()) { state.avatar = avEl.value.trim(); save(); renderMisc(); }
+        });
+        $('#inAvatarFile').addEventListener('change', function () { setAvatarFromFile(this.files[0]); });
+        $('#genAvatar').addEventListener('click', function () { $('#inAvatarFile').click(); });
+        $('#genAvatar').style.cursor = 'pointer';
+        $('#inStart').value = state.rangeStart;
+        $('#inEnd').value = state.rangeEnd;
+        $('#inStart').addEventListener('change', function () { setCustomRange(this.value, $('#inEnd').value); });
+        $('#inEnd').addEventListener('change', function () { setCustomRange($('#inStart').value, this.value); });
+        bind('#inTarget', function () { return state.target; }, function (v) { state.target = Math.max(0, +v || 0); renderTingChart(); renderCalendar(); });
+        $('#inShowTarget').checked = !!state.showTarget;
+        $('#inShowTarget').addEventListener('change', function () { state.showTarget = this.checked; save(); renderTingChart(); });
+        bind('#inStreak', function () { return state.streakOv; }, function (v) { state.streakOv = v.trim(); renderCheckCounts(); });
+        bind('#inTotalSign', function () { return state.totalOv; }, function (v) { state.totalOv = v.trim(); renderCheckCounts(); });
+        bind('#inYearHours', function () { return state.yearHours; }, function (v) { state.yearHours = v.trim(); renderTingChart(); });
+        bind('#inFillRate', function () { return state.fillRate; }, function (v) { state.fillRate = +v || 0; });
+        bind('#inFillMin', function () { return state.fillMin; }, function (v) { state.fillMin = +v || 0; });
+        bind('#inFillMax', function () { return state.fillMax; }, function (v) { state.fillMax = +v || 1; });
+        bind('#inArticle', function () { return state.articleCount; }, function (v) { state.articleCount = +v || 0; renderSeven(); });
+        bind('#inRank', function () { return state.rankPercent; }, function (v) { state.rankPercent = +v || 0; renderSeven(); });
+        [1, 2, 3, 4].forEach(function (i) {
+            bind('#inCh' + i, function () { return state.channels[i - 1]; }, function (v) { state.channels[i - 1] = +v || 0; renderSeven(); });
+        });
+        bind('#inChTip', function () { return state.channelTip; }, function (v) { state.channelTip = v; renderSeven(); });
+        [0, 1, 2, 3, 4].forEach(function (i) {
+            bind('#inP' + i, function () { return state.period[i]; }, function (v) { state.period[i] = +v || 0; renderSeven(); });
+        });
+        bind('#inDubDaily', function () { return state.dubDaily.join(','); }, function (v) {
+            state.dubDaily = v.split(/[,，\s]+/).map(function (x) { return Math.max(0, +x || 0); }).slice(0, 7);
+            renderDub();
+        });
+        bind('#inDubPercent', function () { return state.dubPercent; }, function (v) { state.dubPercent = +v || 0; renderDub(); });
+        bind('#inDubPlay', function () { return state.dubPlay; }, function (v) { state.dubPlay = +v || 0; renderDub(); });
+        bind('#inDubZan', function () { return state.dubZan; }, function (v) { state.dubZan = +v || 0; renderDub(); });
+        bind('#inDubArticle', function () { return state.dubArticle; }, function (v) { state.dubArticle = +v || 0; renderDub(); });
+        bind('#inDubTime', function () { return state.dubTime; }, function (v) { state.dubTime = +v || 0; renderDub(); });
+        [1, 2, 3, 4].forEach(function (i) {
+            bind('#inW' + i, function () { return state.words[i - 1]; }, function (v) { state.words[i - 1] = +v || 0; renderMisc(); });
+        });
+        $('#btnEven').addEventListener('click', function () { distribute(false); });
+        $('#btnRandom').addEventListener('click', function () { distribute(true); });
+        $('#btnZero').addEventListener('click', function () {
+            rangeDates().forEach(function (ds) { state.days[ds] = 0; });
+            save(); refreshAfterDayChange(true);
+        });
+        $('#btnFillYear').addEventListener('click', function () {
+            var t = new Date(), lo = Math.min(state.fillMin, state.fillMax), hi = Math.max(state.fillMin, state.fillMax);
+            var inRange = {};
+            rangeDates().forEach(function (ds) { inRange[ds] = 1; });
+            for (var i = 364; i >= 0; i--) {
+                var ds = fmt(addDays(t, -i));
+                if (inRange[ds]) continue;
+                state.days[ds] = Math.random() * 100 < state.fillRate ? lo + Math.floor(Math.random() * (hi - lo + 1)) : 0;
+            }
+            save(); refreshAfterDayChange(true);
+        });
+        $('#btnClearAll').addEventListener('click', function () {
+            if (!confirm('清空所有每日数据？')) return;
+            state.days = {}; save(); refreshAfterDayChange(true);
+        });
+        $('#btnReset').addEventListener('click', function () {
+            if (!confirm('恢复默认数据？当前编辑将丢失。')) return;
+            localStorage.removeItem(STORE_KEY);
+            location.reload();
+        });
+        $('#btnCapture').addEventListener('click', function () {
+            document.body.classList.add('gen-capture');
+            $('#genPanel').classList.remove('show');
+            setTimeout(function () { document.body.classList.remove('gen-capture'); }, 10000);
+        });
+        $('#genFab').addEventListener('click', function () { $('#genPanel').classList.add('show'); });
+        $('#genClose').addEventListener('click', function () { $('#genPanel').classList.remove('show'); });
+    }
+
+    /* ---------- 启动 ---------- */
+    load();
+    $('#btn7').classList.toggle('activeDate', state.quick === '7');
+    $('#btn30').classList.toggle('activeDate', state.quick === '30');
+    if (state.quick === '') $$('.selectDateBox .dateBtn').forEach(function (el) { el.classList.add('activeDate'); });
+    setTingType(state.chartType || 'column');
+    renderMisc();
+    renderCalendar();
+    renderHeatmap();
+    renderSeven();
+    renderDub();
+    initPanel();
+    renderDayEditor();
+    </script>
+</body>
+</html>
