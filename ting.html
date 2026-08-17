@@ -885,7 +885,19 @@
                 setTimeout(function () {
                     html2canvas(document.body, { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
                         cleanup();
-                        var url = canvas.toDataURL('image/png');
+                        // 整页渲染后按当前滚动位置裁出一屏
+                        var scale = 2;
+                        var vw = document.documentElement.clientWidth, vh = window.innerHeight;
+                        var sy = Math.round((window.scrollY || document.documentElement.scrollTop || 0) * scale);
+                        var sx = Math.round((window.scrollX || document.documentElement.scrollLeft || 0) * scale);
+                        sy = Math.min(sy, Math.max(0, canvas.height - vh * scale));
+                        var out = document.createElement('canvas');
+                        out.width = vw * scale; out.height = vh * scale;
+                        var ctx = out.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, out.width, out.height);
+                        ctx.drawImage(canvas, sx, sy, out.width, out.height, 0, 0, out.width, out.height);
+                        var url = out.toDataURL('image/png');
                         $('#genShotImg').src = url;
                         $('#genShotDl').href = url;
                         $('#genShotMask').classList.add('show');
