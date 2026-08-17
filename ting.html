@@ -24,7 +24,7 @@
     #targetDuration.gen-show { display: inline !important; }
     /* ===== 编辑面板（生成器自带，非原页面元素） ===== */
     .gen-fab {
-        position: fixed; right: 12px; top: 40%; z-index: 20000;
+        position: fixed; left: 12px; top: 40%; z-index: 20000;
         width: 44px; height: 44px; border-radius: 50%; border: 0;
         background: rgba(13,133,255,.92); color: #fff; font-size: 13px;
         box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer;
@@ -63,7 +63,19 @@
     .gen-dayrow input { width: 72px; border: 1px solid #ddd; border-radius: 5px; padding: 3px 6px; text-align: right; }
     .gen-total { color: #0D85FF; font-weight: 600; }
     .gen-tip { color: #999; font-size: 11px; margin: 4px 0; }
-    body.gen-capture .gen-fab, body.gen-capture .gen-panel { display: none !important; }
+    body.gen-capture .gen-fab, body.gen-capture .gen-panel,
+    body.gen-capture .shareDiv, body.gen-capture .gen-shot-mask { display: none !important; }
+    .gen-fab.shot { top: calc(40% + 54px); background: rgba(93,208,141,.95); }
+    .gen-shot-mask {
+        position: fixed; inset: 0; background: rgba(0,0,0,.78); z-index: 30000;
+        display: none; flex-direction: column; align-items: center;
+        padding: 20px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .gen-shot-mask.show { display: flex; }
+    .gen-shot-mask img { max-width: 92%; border-radius: 8px; background: #fff; }
+    .gen-shot-tip { color: #fff; font-size: 13px; margin: 10px 0; flex-shrink: 0; }
+    .gen-shot-btns { display: flex; gap: 12px; margin: 14px 0 30px; flex-shrink: 0; }
+    a.gen-btn { text-decoration: none; color: #fff; }
 </style>
 </head>
 <body class="en" data-lang="en">
@@ -261,6 +273,15 @@
 
     <!-- ===== 编辑面板 ===== -->
     <button class="gen-fab" id="genFab">编辑</button>
+    <button class="gen-fab shot" id="genShot">截图</button>
+    <div class="gen-shot-mask" id="genShotMask">
+        <p class="gen-shot-tip">长按或右键图片即可保存</p>
+        <img id="genShotImg" alt="截图">
+        <div class="gen-shot-btns">
+            <a class="gen-btn" id="genShotDl" download="听力统计.png">下载图片</a>
+            <button class="gen-btn gray" id="genShotClose">关闭</button>
+        </div>
+    </div>
     <div class="gen-panel" id="genPanel">
         <div class="gen-panel-head">统计数据编辑<button id="genClose">×</button></div>
         <div class="gen-panel-body">
@@ -268,26 +289,28 @@
                 <summary>基本信息</summary>
                 <div class="gen-row"><label>昵称</label><input type="text" id="inName"></div>
                 <div class="gen-row"><label>描述</label><input type="text" id="inDesc"></div>
-                <div class="gen-row"><label>头像URL</label><input type="text" id="inAvatar"></div>
-                <div class="gen-row"><label>本地上传</label><input type="file" id="inAvatarFile" accept="image/*" style="flex:1;min-width:0"></div>
-                <div class="gen-tip">也可以直接点页面上的头像换图；本地图片会压缩后存在浏览器里。</div>
+                <div class="gen-row"><label>头像</label><input type="file" id="inAvatarFile" accept="image/*" style="flex:1;min-width:0"></div>
+                <div class="gen-tip">也可以直接点页面上的头像换图。</div>
             </details>
             <details open>
-                <summary>时间范围与每日时长</summary>
-                <div class="gen-row"><label>开始日期</label><input type="date" id="inStart"></div>
-                <div class="gen-row"><label>结束日期</label><input type="date" id="inEnd"></div>
+                <summary>时间与时长</summary>
+                <div class="gen-row"><label>选择月份</label><input type="month" id="inMonth"></div>
                 <div class="gen-row"><label>总时长</label>
                     <input type="number" id="inTotalH" min="0" style="width:60px">小时
                     <input type="number" id="inTotalM" min="0" max="59" style="width:60px">分钟
                 </div>
+                <div class="gen-row"><label>随机天数</label><input type="number" id="inRandDays" min="1" style="width:60px">天</div>
                 <div class="gen-row">
-                    <button class="gen-btn" id="btnEven">均匀分配</button>
                     <button class="gen-btn" id="btnRandom">随机分配</button>
-                    <button class="gen-btn gray" id="btnZero">范围清零</button>
+                    <button class="gen-btn" id="btnEven">均匀分配</button>
+                    <button class="gen-btn gray" id="btnZero">清零</button>
                 </div>
-                <div class="gen-tip">先填总时长再点分配，会把时间摊到范围内每一天；下面也可以逐天手动改。</div>
-                <div class="gen-daylist" id="genDayList"></div>
-                <div class="gen-tip">当前范围合计：<span class="gen-total" id="genRangeTotal"></span></div>
+                <div class="gen-tip">随机分配：把总时长随机摊到该月内随机 N 天；均匀分配：每天平均。页面上也可点近7天/近30天或自选日期。</div>
+                <details>
+                    <summary style="color:#999;font-weight:normal">逐日微调</summary>
+                    <div class="gen-daylist" id="genDayList"></div>
+                    <div class="gen-tip">当前范围合计：<span class="gen-total" id="genRangeTotal"></span></div>
+                </details>
             </details>
             <details>
                 <summary>打卡与年度数据</summary>
@@ -337,7 +360,6 @@
                 <div class="gen-row"><label>加入生词本</label><input type="number" id="inW4" min="0"></div>
             </details>
             <div class="gen-row" style="margin-top:14px">
-                <button class="gen-btn gray" id="btnCapture">截图模式(隐藏按钮10秒)</button>
                 <button class="gen-btn warn" id="btnReset">恢复默认</button>
             </div>
             <div class="gen-tip">数据自动保存在浏览器本地(localStorage)，刷新不丢失。</div>
@@ -387,7 +409,7 @@
             period: [30, 120, 260, 380, 146],
             dubDaily: [0, 0, 0, 0, 0, 0, 0], dubPercent: 0, dubPlay: 0, dubZan: 0, dubArticle: 0, dubTime: 0,
             words: [45, 230, 3, 12],
-            fillRate: 55, fillMin: 5, fillMax: 95
+            fillRate: 55, fillMin: 5, fillMax: 95, randDays: 15
         };
         for (var i = 364; i >= 7; i--) {
             if (Math.random() < 0.55) s.days[fmt(addDays(end, -i))] = 5 + Math.floor(Math.random() * 90);
@@ -778,20 +800,105 @@
     function distribute(random) {
         var total = Math.max(0, (+$('#inTotalH').value || 0) * 60 + (+$('#inTotalM').value || 0));
         var dates = rangeDates(), n = dates.length;
-        var alloc;
+        var alloc = dates.map(function () { return 0; });
         if (!random) {
             var base = Math.floor(total / n), rem = total - base * n;
             alloc = dates.map(function (_, i) { return base + (i < rem ? 1 : 0); });
         } else {
-            var w = dates.map(function () { return 0.35 + Math.random(); });
+            var N = Math.min(n, Math.max(1, Math.floor(+$('#inRandDays').value || n)));
+            var idx = dates.map(function (_, i) { return i; });
+            for (var i = idx.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+            }
+            var chosen = idx.slice(0, N);
+            var w = chosen.map(function () { return 0.35 + Math.random(); });
             var ws = w.reduce(function (a, b) { return a + b; }, 0);
-            alloc = w.map(function (x) { return Math.floor(total * x / ws); });
+            chosen.forEach(function (ci, k) { alloc[ci] = Math.floor(total * w[k] / ws); });
             var diff = total - alloc.reduce(function (a, b) { return a + b; }, 0);
-            for (var i = 0; diff > 0; i = (i + 1) % n) { alloc[i]++; diff--; }
+            for (var k = 0; diff > 0; k = (k + 1) % chosen.length) { alloc[chosen[k]]++; diff--; }
         }
         dates.forEach(function (ds, i) { state.days[ds] = alloc[i]; });
         save();
         refreshAfterDayChange(true);
+    }
+
+    /* ---------- 一键截图 ---------- */
+    function loadHtml2canvas(ok, fail) {
+        if (window.html2canvas) return ok();
+        var urls = [
+            'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+            'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+        ];
+        (function tryNext(i) {
+            if (i >= urls.length) return fail();
+            var s = document.createElement('script');
+            s.src = urls[i];
+            s.onload = ok;
+            s.onerror = function () { tryNext(i + 1); };
+            document.head.appendChild(s);
+        })(0);
+    }
+    /* 欧路 CDN 的 CORS 头无效会污染 canvas，截图前临时把跨域图片换成 wsrv.nl 代理 */
+    function swapImagesForCapture() {
+        var swapped = [], waits = [];
+        Array.prototype.forEach.call(document.images, function (img) {
+            var src = img.getAttribute('src') || '';
+            try {
+                var u = new URL(src, location.href);
+                if (u.protocol.indexOf('http') === 0 && u.origin !== location.origin) {
+                    swapped.push([img, src]);
+                    waits.push(new Promise(function (res) {
+                        img.onload = img.onerror = res;
+                        setTimeout(res, 8000);
+                    }));
+                    img.crossOrigin = 'anonymous';
+                    img.src = 'https://wsrv.nl/?url=' + encodeURIComponent(u.href);
+                }
+            } catch (e) { }
+        });
+        return {
+            done: Promise.all(waits),
+            restore: function () {
+                swapped.forEach(function (p) {
+                    p[0].onload = p[0].onerror = null;
+                    p[0].removeAttribute('crossorigin');
+                    p[0].src = p[1];
+                });
+            }
+        };
+    }
+    function doCapture() {
+        $('#genPanel').classList.remove('show');
+        document.body.classList.add('gen-capture');
+        var hm = $('#heatmap'), inner = $('#cal-heatmap-container');
+        inner.style.marginLeft = -hm.scrollLeft + 'px';
+        var swap = swapImagesForCapture();
+        function cleanup() {
+            document.body.classList.remove('gen-capture');
+            inner.style.marginLeft = '';
+            swap.restore();
+        }
+        loadHtml2canvas(function () {
+            swap.done.then(function () {
+                setTimeout(function () {
+                    html2canvas(document.body, { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
+                        cleanup();
+                        var url = canvas.toDataURL('image/png');
+                        $('#genShotImg').src = url;
+                        $('#genShotDl').href = url;
+                        $('#genShotMask').classList.add('show');
+                    }).catch(function (e) {
+                        cleanup();
+                        alert('截图失败：' + (e && e.message || e) + '，可改用系统截屏');
+                    });
+                }, 200);
+            });
+        }, function () {
+            cleanup();
+            alert('截图组件加载失败，请检查网络后重试');
+        });
     }
 
     /* ---------- 页面原生控件 ---------- */
@@ -803,8 +910,7 @@
         $('#btn7').classList.toggle('activeDate', days === 7);
         $('#btn30').classList.toggle('activeDate', days === 30);
         $$('.selectDateBox .dateBtn').forEach(function (e) { e.classList.remove('activeDate'); });
-        $('#inStart').value = state.rangeStart;
-        $('#inEnd').value = state.rangeEnd;
+        $('#inMonth').value = state.rangeEnd.slice(0, 7);
         refreshAfterDayChange(true);
     }
     $('#btn7').addEventListener('click', function () { setQuick(7); });
@@ -817,7 +923,7 @@
         $('#btn7').classList.remove('activeDate');
         $('#btn30').classList.remove('activeDate');
         $$('.selectDateBox .dateBtn').forEach(function (el) { el.classList.add('activeDate'); });
-        $('#inStart').value = s; $('#inEnd').value = e;
+        $('#inMonth').value = e.slice(0, 7);
         refreshAfterDayChange(true);
     }
     $('.date_input1').addEventListener('change', function () { setCustomRange(this.value, $('.date_input2').value); });
@@ -860,9 +966,6 @@
             state.avatar = c.toDataURL('image/jpeg', 0.88);
             save();
             renderMisc();
-            var inp = $('#inAvatar');
-            inp.value = '';
-            inp.placeholder = '已使用本地上传的图片';
         };
         img.onerror = function () { URL.revokeObjectURL(url); alert('图片读取失败'); };
         img.src = url;
@@ -877,19 +980,23 @@
     function initPanel() {
         bind('#inName', function () { return state.name; }, function (v) { state.name = v; renderMisc(); });
         bind('#inDesc', function () { return state.desc; }, function (v) { state.desc = v; renderMisc(); });
-        var avEl = $('#inAvatar');
-        if (state.avatar.slice(0, 5) === 'data:') { avEl.value = ''; avEl.placeholder = '已使用本地上传的图片'; }
-        else { avEl.value = state.avatar; }
-        avEl.addEventListener('input', function () {
-            if (avEl.value.trim()) { state.avatar = avEl.value.trim(); save(); renderMisc(); }
-        });
         $('#inAvatarFile').addEventListener('change', function () { setAvatarFromFile(this.files[0]); });
         $('#genAvatar').addEventListener('click', function () { $('#inAvatarFile').click(); });
         $('#genAvatar').style.cursor = 'pointer';
-        $('#inStart').value = state.rangeStart;
-        $('#inEnd').value = state.rangeEnd;
-        $('#inStart').addEventListener('change', function () { setCustomRange(this.value, $('#inEnd').value); });
-        $('#inEnd').addEventListener('change', function () { setCustomRange($('#inStart').value, this.value); });
+        $('#inMonth').value = state.rangeEnd.slice(0, 7);
+        $('#inMonth').addEventListener('change', function () {
+            if (!this.value) return;
+            var y = +this.value.slice(0, 4), m = +this.value.slice(5, 7);
+            var start = y + '-' + pad(m) + '-01';
+            var end = y + '-' + pad(m) + '-' + pad(new Date(y, m, 0).getDate());
+            if (start <= todayStr() && end > todayStr()) end = todayStr();
+            setCustomRange(start, end);
+        });
+        $('#inRandDays').value = state.randDays || 15;
+        $('#inRandDays').addEventListener('input', function () {
+            state.randDays = Math.max(1, Math.floor(+this.value || 1));
+            save();
+        });
         bind('#inTarget', function () { return state.target; }, function (v) { state.target = Math.max(0, +v || 0); renderTingChart(); renderCalendar(); });
         $('#inShowTarget').checked = !!state.showTarget;
         $('#inShowTarget').addEventListener('change', function () { state.showTarget = this.checked; save(); renderTingChart(); });
@@ -946,11 +1053,8 @@
             localStorage.removeItem(STORE_KEY);
             location.reload();
         });
-        $('#btnCapture').addEventListener('click', function () {
-            document.body.classList.add('gen-capture');
-            $('#genPanel').classList.remove('show');
-            setTimeout(function () { document.body.classList.remove('gen-capture'); }, 10000);
-        });
+        $('#genShot').addEventListener('click', doCapture);
+        $('#genShotClose').addEventListener('click', function () { $('#genShotMask').classList.remove('show'); });
         $('#genFab').addEventListener('click', function () { $('#genPanel').classList.add('show'); });
         $('#genClose').addEventListener('click', function () { $('#genPanel').classList.remove('show'); });
     }
