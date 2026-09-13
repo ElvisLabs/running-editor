@@ -5,6 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=no viewport-fit=cover">
     <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="听力统计">
+    <link rel="manifest" href="ting.webmanifest">
+    <link rel="apple-touch-icon" href="ting-icon-192.png">
     <link href="https://dict.eudic.net/Content/css/dictbody.css?20240419" rel="stylesheet" />
     <link rel="stylesheet" href="https://dict.eudic.net/Content/css/mobile/mobile.css?20240419" />
     <link rel="stylesheet" type="text/css" href="https://dict.eudic.net/Content/css/ting/statisticsPage.css?_=081720250702">
@@ -64,6 +71,26 @@
     .gen-total { color: #0D85FF; font-weight: 600; }
     .gen-tip { color: #999; font-size: 11px; margin: 4px 0; }
     .shareDiv.shareDiv1 { display: block; }
+    /* 全屏(添加到主屏幕)模式下的仿 App 标题栏，与截图合成的标题栏同尺寸 */
+    .app-titlebar { display: none; }
+    body.app-mode { padding-top: 46px; }
+    body.app-mode .app-titlebar {
+        display: block; position: fixed; top: 0; left: 0; right: 0; height: 46px;
+        background: #fff; z-index: 1000;
+    }
+    .app-titlebar svg { position: absolute; left: 0; top: 0; }
+    .app-titlebar .atb-title {
+        position: absolute; left: 115px; right: 15px; top: 0; line-height: 52px;
+        font-size: 18px; font-weight: 600; color: #222;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    body.fabs-hidden .gen-fab { display: none; }
+    .gen-toast {
+        position: fixed; left: 50%; top: 45%; transform: translateX(-50%); z-index: 30001;
+        background: rgba(0,0,0,.75); color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 8px;
+        opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
+    }
+    .gen-toast.show { opacity: 1; }
     body { padding-bottom: calc(65px + env(safe-area-inset-bottom)); }
     .gen-row select { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font-size: 13px; background: #fff; }
     body.gen-capture .gen-fab, body.gen-capture .gen-panel,
@@ -82,6 +109,14 @@
 </style>
 </head>
 <body class="en" data-lang="en">
+    <div class="app-titlebar" id="appTitlebar">
+        <svg width="110" height="46" viewBox="0 0 110 46" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M29 17 L22 25 L29 33" stroke="#222" stroke-width="2"/>
+            <path d="M57.5 19 V31" stroke="#9a9a9a" stroke-width="1"/>
+            <path d="M81 18 L95 32 M95 18 L81 32" stroke="#222" stroke-width="2"/>
+        </svg>
+        <span class="atb-title" id="appTitle">ElvisDing的听力统计</span>
+    </div>
     <div class="user scale">
         <dl class="person">
             <div class="headinfo">
@@ -274,6 +309,7 @@
     <!-- ===== 编辑面板 ===== -->
     <button class="gen-fab" id="genFab">编辑</button>
     <button class="gen-fab shot" id="genShot">截图</button>
+    <div class="gen-toast" id="genToast"></div>
     <div class="gen-shot-mask" id="genShotMask">
         <p class="gen-shot-tip">长按或右键图片即可保存</p>
         <img id="genShotImg" alt="截图">
@@ -759,6 +795,7 @@
         $('#genDesc').textContent = state.vip ? 'VIP用户' : '普通用户';
         $('#genAvatar').src = state.avatar;
         document.title = state.name + '的听力统计';
+        $('#appTitle').textContent = state.name + '的听力统计';
         for (var i = 0; i < 4; i++) $('#word' + (i + 1)).textContent = state.words[i];
     }
 
@@ -1089,6 +1126,26 @@
         img.src = url;
     }
 
+    /* ---------- 全屏(主屏幕)模式 ---------- */
+    var isAppMode = window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.navigator.standalone === true || /[?&]app=1\b/.test(location.search);
+    if (isAppMode) {
+        document.body.classList.add('app-mode');
+        $('#genShot').textContent = '隐藏';
+    }
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        navigator.serviceWorker.register('ting-sw.js', { scope: './ting.html' }).catch(function () { });
+    }
+    var toastTimer;
+    function toast(msg) {
+        var t = $('#genToast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+    }
+
     /* ---------- 编辑面板绑定 ---------- */
     function bind(id, get, apply) {
         var el = $(id);
@@ -1174,7 +1231,13 @@
             localStorage.removeItem(STORE_KEY);
             location.reload();
         });
-        $('#genShot').addEventListener('click', doCapture);
+        $('#genShot').addEventListener('click', function () {
+            if (!isAppMode) return doCapture();
+            $('#genPanel').classList.remove('show');
+            document.body.classList.add('fabs-hidden');
+            toast('按钮已隐藏，可用系统截屏；点顶部标题栏恢复');
+        });
+        $('#appTitlebar').addEventListener('click', function () { document.body.classList.remove('fabs-hidden'); });
         $('#genShotClose').addEventListener('click', function () { $('#genShotMask').classList.remove('show'); });
         $('#genFab').addEventListener('click', function () { $('#genPanel').classList.add('show'); });
         $('#genClose').addEventListener('click', function () { $('#genPanel').classList.remove('show'); });
