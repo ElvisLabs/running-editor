@@ -63,6 +63,9 @@
     .gen-dayrow input { width: 72px; border: 1px solid #ddd; border-radius: 5px; padding: 3px 6px; text-align: right; }
     .gen-total { color: #0D85FF; font-weight: 600; }
     .gen-tip { color: #999; font-size: 11px; margin: 4px 0; }
+    .shareDiv.shareDiv1 { display: block; }
+    body { padding-bottom: calc(65px + env(safe-area-inset-bottom)); }
+    .gen-row select { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font-size: 13px; background: #fff; }
     body.gen-capture .gen-fab, body.gen-capture .gen-panel,
     body.gen-capture .shareDiv, body.gen-capture .gen-shot-mask { display: none !important; }
     .gen-fab.shot { top: calc(40% + 54px); background: rgba(93,208,141,.95); }
@@ -96,7 +99,7 @@
                 <span class="chartTypeBtn" id="tingToggleBtn" data-type="column">曲线图</span>
          </div>
          </div>
-        <div class="sortPage" style="display:none"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
+        <div class="sortPage"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
         </div>
         <div class="eudicStudyTime">
             <div class="eudicTimeRange">
@@ -122,7 +125,7 @@
                 <img src="https://static.frdic.com/web/statistics/strawLeftNew.png">
                 <div class="listentoDate">
                    <div class="totalTimeBox"><span id="curDaysDuration"></span><span id="playDuration"></span><span id="targetDuration"></span></div>
-                   <div class="totalTimeTip vipTip" id="totalTimeTip" style="display:none"></div>
+                   <div class="totalTimeTip vipTip" id="totalTimeTip"></div>
                 </div>
                 <img src="https://static.frdic.com/web/statistics/strawRightNew.png">
             </div>
@@ -213,7 +216,7 @@
                     <span class="chartTypeBtn" id="dubToggleBtn" data-type="areaspline">柱状图</span>
                 </div>
             </div>
-            <div class="dubSort" style="display:none"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
+            <div class="dubSort"><a href="#"><img src="https://static.frdic.com/web/statistics/sortIcon.png">排行榜</a></div>
         </div>
         <div class="eudicStudyTime">
             <div class="eudicTimeRange">
@@ -256,11 +259,8 @@
     </div>
 
     <div class="container">
-        <div class="shareDiv shareDiv2">
-            <div id="weichat">
-                <img src="https://static.eudic.net/img/crcode_en.png" class="weicrcode" />
-            </div>
-            <div id="shareme"><a href="https://www.eudic.net/v4/en/app/ting" class="share"><div class="shareinfo">下载「每日英语听力」</div></a></div>
+        <div class="shareDiv shareDiv1">
+            <div id="shareme"><a class="share"><div class="shareinfo">分享</div></a></div>
         </div>
     </div>
 
@@ -288,7 +288,9 @@
             <details open>
                 <summary>基本信息</summary>
                 <div class="gen-row"><label>昵称</label><input type="text" id="inName"></div>
-                <div class="gen-row"><label>描述</label><input type="text" id="inDesc"></div>
+                <div class="gen-row"><label>身份</label><select id="inVip"><option value="0">普通用户</option><option value="1">VIP用户</option></select></div>
+                <div class="gen-row"><label>状态栏时间</label><input type="text" id="inClock" placeholder="留空=当前时间"></div>
+                <div class="gen-row"><label>电量</label><input type="number" id="inBattery" min="1" max="100">%</div>
                 <div class="gen-row"><label>头像</label><input type="file" id="inAvatarFile" accept="image/*" style="flex:1;min-width:0"></div>
                 <div class="gen-tip">也可以直接点页面上的头像换图。</div>
             </details>
@@ -318,7 +320,7 @@
                 <div class="gen-row"><label>显示目标</label><input type="checkbox" id="inShowTarget" style="flex:0">在时长文案中显示目标</div>
                 <div class="gen-row"><label>连续打卡</label><input type="text" id="inStreak" placeholder="留空=自动"></div>
                 <div class="gen-row"><label>累计打卡</label><input type="text" id="inTotalSign" placeholder="留空=自动"></div>
-                <div class="gen-row"><label>近一年时长</label><input type="text" id="inYearHours" placeholder="小时，留空=自动"></div>
+                <div class="gen-row"><label>年/总时长</label><input type="text" id="inYearHours" placeholder="小时，留空=自动"></div>
                 <div class="gen-tip">打卡规则：当天听力分钟数 ≥ 目标时长即打卡；日历上点某天可补签/取消。</div>
                 <div class="gen-row"><label>年度填充</label>活跃率<input type="number" id="inFillRate" min="0" max="100" style="width:52px">%</div>
                 <div class="gen-row"><label>每日区间</label><input type="number" id="inFillMin" min="0" style="width:52px">~<input type="number" id="inFillMax" min="1" style="width:52px">分钟</div>
@@ -409,7 +411,8 @@
             period: [30, 120, 260, 380, 146],
             dubDaily: [0, 0, 0, 0, 0, 0, 0], dubPercent: 0, dubPlay: 0, dubZan: 0, dubArticle: 0, dubTime: 0,
             words: [45, 230, 3, 12],
-            fillRate: 55, fillMin: 5, fillMax: 95, randDays: 15
+            fillRate: 55, fillMin: 5, fillMax: 95, randDays: 15,
+            vip: false, clock: '', battery: 40
         };
         for (var i = 364; i >= 7; i--) {
             if (Math.random() < 0.55) s.days[fmt(addDays(end, -i))] = 5 + Math.floor(Math.random() * 90);
@@ -423,6 +426,9 @@
             var raw = localStorage.getItem(STORE_KEY);
             if (raw) {
                 state = JSON.parse(raw);
+                if (state.vip === undefined) state.vip = /VIP/i.test(state.desc || '');
+                if (state.clock === undefined) state.clock = '';
+                if (!state.battery) state.battery = 40;
                 if (state.quick === '7') { state.rangeEnd = todayStr(); state.rangeStart = fmt(addDays(new Date(), -6)); }
                 if (state.quick === '30') { state.rangeEnd = todayStr(); state.rangeStart = fmt(addDays(new Date(), -29)); }
                 return;
@@ -498,14 +504,6 @@
     };
     var chart = Highcharts.chart('userChangeCalendar_div', Highcharts.merge(true, {}, commonConfig, columnConfig));
 
-    function lastTooltip(c) {
-        setTimeout(function () {
-            var s = c.series[0]; if (!s || !s.points.length) return;
-            c.tooltip.shared = false;
-            c.tooltip.refresh(s.points[s.points.length - 1]);
-        }, 1200);
-    }
-
     function renderTingChart() {
         var dates = rangeDates();
         gDD = dates;
@@ -521,15 +519,15 @@
         else { chart.yAxis[0].update({ minRange: 0 }, false); }
         chart.xAxis[0].setCategories(gCats, false);
         chart.addSeries({ name: '听力统计', data: data });
-        lastTooltip(chart);
         var label = state.quick === '7' ? '近7天' : state.quick === '30' ? '近30天' : '该时段内';
         $('#curDaysDuration').innerHTML = label + '收听<span class="lightDay">' + Math.floor(total / 60) + '小时' + (total % 60) + '分钟</span>，';
         var yh = state.yearHours !== '' ? state.yearHours : (function () {
             var sum = 0, t = new Date();
             for (var i = 0; i < 365; i++) sum += minutesOf(fmt(addDays(t, -i)));
-            return (sum / 60).toFixed(1);
+            return Number((sum / 60).toFixed(1));
         })();
-        $('#playDuration').innerHTML = '近一年时长为<span class="lightDay">' + yh + '小时</span>';
+        $('#playDuration').innerHTML = (state.vip ? '总时长为' : '近一年时长为') + '<span class="lightDay">' + yh + '小时</span>';
+        $('#totalTimeTip').innerHTML = state.vip ? '注：总时长从您开通VIP当天开始计算' : '<a>开通终身VIP可以长期保留统计数据&nbsp;&nbsp;></a>';
         var tgt = $('#targetDuration');
         if (state.showTarget && state.target > 0) {
             tgt.className = 'gen-show';
@@ -758,7 +756,7 @@
     /* ---------- 词汇 / 头部 ---------- */
     function renderMisc() {
         $('#genName').textContent = state.name;
-        $('#genDesc').textContent = state.desc;
+        $('#genDesc').textContent = state.vip ? 'VIP用户' : '普通用户';
         $('#genAvatar').src = state.avatar;
         document.title = state.name + '的听力统计';
         for (var i = 0; i < 4; i++) $('#word' + (i + 1)).textContent = state.words[i];
@@ -869,34 +867,142 @@
             }
         };
     }
+    var STATUS_H = 36, TITLE_H = 46, SHARE_H = 65;
+    var UI_FONT = '-apple-system, "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif';
+    function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+    function clockText() {
+        if (state.clock) return state.clock;
+        var d = new Date();
+        return d.getHours() + ':' + pad(d.getMinutes());
+    }
+    function drawPhoneChrome(ctx, W, H, s) {
+        ctx.save();
+        ctx.scale(s, s);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, STATUS_H + TITLE_H);
+        ctx.textBaseline = 'middle';
+
+        // 状态栏
+        var ink = '#111111', mid = STATUS_H / 2;
+        ctx.fillStyle = ink;
+        ctx.font = '500 16px ' + UI_FONT;
+        ctx.fillText(clockText(), 28, mid + 1);
+        var bw = 23, bh = 12, bx = W - 31 - bw, by = mid - bh / 2;
+        ctx.strokeStyle = ink; ctx.lineWidth = 1.3;
+        roundRect(ctx, bx, by, bw, bh, 3.5); ctx.stroke();
+        var level = Math.max(1, Math.min(100, state.battery || 40)) / 100;
+        roundRect(ctx, bx + 2.2, by + 2.2, Math.max(2, (bw - 4.4) * level), bh - 4.4, 1.8); ctx.fill();
+        roundRect(ctx, bx + bw + 1.3, by + 3.8, 2, bh - 7.6, 1); ctx.fill();
+        var sx = bx - 30, base = by + bh;
+        [4, 6.5, 9, 12].forEach(function (h, i) { roundRect(ctx, sx + i * 4.6, base - h, 3, h, 0.8); ctx.fill(); });
+        ctx.font = 'bold 8px ' + UI_FONT;
+        ctx.fillText('4G', sx - 13, mid - 2.5);
+        ctx.font = 'bold 6px ' + UI_FONT;
+        ctx.fillText('↑↓', sx - 12, mid + 5);
+
+        // 标题栏
+        var cy = STATUS_H + TITLE_H / 2 + 2;
+        ctx.strokeStyle = '#222222'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(29, cy - 8); ctx.lineTo(22, cy); ctx.lineTo(29, cy + 8); ctx.stroke();
+        ctx.strokeStyle = '#9a9a9a'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(57.5, cy - 6); ctx.lineTo(57.5, cy + 6); ctx.stroke();
+        ctx.strokeStyle = '#222222'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(81, cy - 7); ctx.lineTo(95, cy + 7); ctx.moveTo(95, cy - 7); ctx.lineTo(81, cy + 7); ctx.stroke();
+        ctx.fillStyle = '#222222';
+        ctx.font = '600 18px ' + UI_FONT;
+        var title = state.name + '的听力统计', maxW = W - 130;
+        while (title.length > 1 && ctx.measureText(title).width > maxW) title = title.slice(0, -2) + '…';
+        ctx.fillText(title, 115, cy + 1);
+
+        // 底部分享栏
+        var top = H - SHARE_H;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, top, W, SHARE_H);
+        ctx.fillStyle = '#0D85FF';
+        roundRect(ctx, 15, top + 4, W - 30, 46, 6); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 15px ' + UI_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillText('分享', W / 2, top + 4 + 23);
+        ctx.restore();
+    }
+    /* html2canvas 画不对横向滚动容器里的 SVG，截图前按屏幕位置把可见部分重绘成 canvas */
+    function freezeHeatmap(s) {
+        var hm = $('#heatmap'), inner = $('#cal-heatmap-container'), svg = inner.querySelector('svg');
+        if (!svg) return function () { };
+        var box = hm.getBoundingClientRect();
+        var left = box.left + hm.clientLeft, top = box.top + hm.clientTop;
+        var cw = hm.clientWidth, ch = hm.clientHeight;
+        var c = document.createElement('canvas');
+        c.width = Math.round(cw * s); c.height = Math.round(ch * s);
+        c.style.cssText = 'display:block;width:' + cw + 'px;height:' + ch + 'px';
+        var ctx = c.getContext('2d');
+        ctx.scale(s, s);
+        Array.prototype.forEach.call(svg.querySelectorAll('rect'), function (el) {
+            var r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+            if (!r.width || cs.display === 'none' || r.right < left || r.left > left + cw) return;
+            ctx.fillStyle = cs.fill;
+            roundRect(ctx, r.left - left, r.top - top, r.width, r.height, parseFloat(el.getAttribute('rx')) || 0);
+            ctx.fill();
+        });
+        ctx.textBaseline = 'middle';
+        Array.prototype.forEach.call(svg.querySelectorAll('text'), function (el) {
+            var r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+            if (!r.width || cs.display === 'none' || r.right < left || r.left > left + cw) return;
+            ctx.fillStyle = cs.fill;
+            ctx.font = cs.fontSize + ' ' + cs.fontFamily;
+            ctx.fillText(el.textContent, r.left - left, r.top - top + r.height / 2);
+        });
+        var scrollLeft = hm.scrollLeft;
+        inner.style.display = 'none';
+        hm.insertBefore(c, inner);
+        return function () {
+            hm.removeChild(c);
+            inner.style.display = '';
+            hm.scrollLeft = scrollLeft;
+        };
+    }
     function doCapture() {
         $('#genPanel').classList.remove('show');
+        var dpr = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
+        var unfreeze = freezeHeatmap(dpr);
         document.body.classList.add('gen-capture');
-        var hm = $('#heatmap'), inner = $('#cal-heatmap-container');
-        inner.style.marginLeft = -hm.scrollLeft + 'px';
         var swap = swapImagesForCapture();
         function cleanup() {
             document.body.classList.remove('gen-capture');
-            inner.style.marginLeft = '';
+            unfreeze();
             swap.restore();
         }
+        var vw = document.documentElement.clientWidth;
+        var W = Math.min(vw, 600), x0 = Math.round((vw - W) / 2);
+        var H = Math.round(Math.min(Math.max(window.innerHeight, (window.screen && screen.height) || 0), W * 2.3));
+        if (H < W * 1.6) H = Math.round(W * 2.17);
+        var sliceH = H - STATUS_H - TITLE_H;
+        var scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        var y0 = Math.max(0, Math.min(scrollY, document.documentElement.scrollHeight - sliceH));
         loadHtml2canvas(function () {
             swap.done.then(function () {
                 setTimeout(function () {
-                    html2canvas(document.body, { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
+                    html2canvas(document.body, {
+                        useCORS: true, scale: dpr, backgroundColor: '#ffffff',
+                        x: x0, y: y0, width: W, height: sliceH
+                    }).then(function (canvas) {
                         cleanup();
-                        // 整页渲染后按当前滚动位置裁出一屏
-                        var scale = 2;
-                        var vw = document.documentElement.clientWidth, vh = window.innerHeight;
-                        var sy = Math.round((window.scrollY || document.documentElement.scrollTop || 0) * scale);
-                        var sx = Math.round((window.scrollX || document.documentElement.scrollLeft || 0) * scale);
-                        sy = Math.min(sy, Math.max(0, canvas.height - vh * scale));
                         var out = document.createElement('canvas');
-                        out.width = vw * scale; out.height = vh * scale;
+                        out.width = Math.round(W * dpr); out.height = Math.round(H * dpr);
                         var ctx = out.getContext('2d');
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, out.width, out.height);
-                        ctx.drawImage(canvas, sx, sy, out.width, out.height, 0, 0, out.width, out.height);
+                        ctx.drawImage(canvas, 0, Math.round((STATUS_H + TITLE_H) * dpr));
+                        drawPhoneChrome(ctx, W, H, dpr);
                         var url = out.toDataURL('image/png');
                         $('#genShotImg').src = url;
                         $('#genShotDl').href = url;
@@ -991,7 +1097,10 @@
     }
     function initPanel() {
         bind('#inName', function () { return state.name; }, function (v) { state.name = v; renderMisc(); });
-        bind('#inDesc', function () { return state.desc; }, function (v) { state.desc = v; renderMisc(); });
+        $('#inVip').value = state.vip ? '1' : '0';
+        $('#inVip').addEventListener('change', function () { state.vip = this.value === '1'; save(); renderMisc(); renderTingChart(); });
+        bind('#inClock', function () { return state.clock; }, function (v) { state.clock = v.trim(); });
+        bind('#inBattery', function () { return state.battery; }, function (v) { state.battery = Math.max(1, Math.min(100, +v || 1)); });
         $('#inAvatarFile').addEventListener('change', function () { setAvatarFromFile(this.files[0]); });
         $('#genAvatar').addEventListener('click', function () { $('#inAvatarFile').click(); });
         $('#genAvatar').style.cursor = 'pointer';
