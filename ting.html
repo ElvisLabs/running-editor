@@ -1145,20 +1145,19 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
     }
-    /* 网页无法感知系统截屏，全屏模式下改为闲置 3 秒自动隐藏按钮，点标题栏唤出 */
+    /* 网页无法感知系统截屏，改为闲置 3 秒自动隐藏按钮，轻点页面唤出 */
     var fabTimer;
     function hideFabs() {
         clearTimeout(fabTimer);
         document.body.classList.add('fabs-hidden');
-        var n = +(localStorage.getItem('eudicTingFabHint') || 0);
+        var n = +(localStorage.getItem('eudicTingFabHint2') || 0);
         if (n < 2) {
-            localStorage.setItem('eudicTingFabHint', n + 1);
-            toast('按钮已隐藏，点顶部标题栏可唤出');
+            localStorage.setItem('eudicTingFabHint2', n + 1);
+            toast('按钮已隐藏，轻点页面可唤出');
         }
     }
     function scheduleFabHide() {
         clearTimeout(fabTimer);
-        if (!isAppMode) return;
         fabTimer = setTimeout(function () {
             if (!$('#genPanel').classList.contains('show')) hideFabs();
         }, 3000);
@@ -1258,9 +1257,13 @@
             $('#genPanel').classList.remove('show');
             hideFabs();
         });
-        $('#appTitlebar').addEventListener('click', showFabs);
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.gen-fab, .gen-panel, .gen-shot-mask')) return;
+            showFabs();
+        });
         $('#genFab').addEventListener('click', function () { clearTimeout(fabTimer); });
         $('#genClose').addEventListener('click', scheduleFabHide);
+        $('#genShotClose').addEventListener('click', showFabs);
         scheduleFabHide();
         $('#genShotClose').addEventListener('click', function () { $('#genShotMask').classList.remove('show'); });
         $('#genFab').addEventListener('click', function () { $('#genPanel').classList.add('show'); });
