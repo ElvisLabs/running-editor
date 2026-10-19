@@ -1,677 +1,603 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Running Data Editor</title>
+<meta charset="utf-8">
+<title>跑步月数据</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="跑步">
+<link rel="manifest" href="running.webmanifest">
+<link rel="apple-touch-icon" href="running-icon-192.png">
 <style>
+/* 页面按 750 设计稿等比缩放：1rem = 设计稿 10px */
+/* 手机上满屏，桌面上按一部手机的宽度居中预览 */
+html { font-size: calc(min(100vw, 480px) / 75); -webkit-text-size-adjust: 100%; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-  background: #1a1a2e;
-  color: #e0e0e0;
-  min-height: 100vh;
-  display: flex;
+  background: #fff; color: #1A1A1A;
+  font-family: "PingFang SC", -apple-system, "Hiragino Sans GB", sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
-.panel {
-  width: 380px;
-  padding: 24px;
-  background: #16213e;
-  overflow-y: auto;
-  height: 100vh;
-  flex-shrink: 0;
+.num { font-family: "DIN Alternate", -apple-system, "Helvetica Neue", sans-serif; font-weight: bold; }
+
+/* ================= 页面本体（仿 App 月数据页） ================= */
+.screen {
+  max-width: 480px; margin: 0 auto;
+  display: flex; flex-direction: column;
+  min-height: 100vh; min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.panel h1 { font-size: 20px; margin-bottom: 20px; color: #4db890; border-bottom: 1px solid #2a3a5c; padding-bottom: 12px; }
-.panel h2 { font-size: 14px; color: #8899bb; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
-.field { margin-bottom: 12px; }
-.field label { display: block; font-size: 13px; color: #99aabb; margin-bottom: 4px; }
-.field input, .field select {
-  width: 100%; padding: 8px 12px; background: #0f3460;
-  border: 1px solid #2a3a5c; border-radius: 6px; color: #e0e0e0; font-size: 14px; outline: none;
+
+/* ---- 导航栏 ---- */
+.nav { position: relative; height: 5.2rem; margin-top: 1.4rem; flex-shrink: 0; }
+.nav .back {
+  position: absolute; left: 3.6rem; top: 1.6rem; width: 1.6rem; height: 1.6rem;
+  border-left: .3rem solid #BBB; border-bottom: .3rem solid #BBB;
+  transform: rotate(45deg); border-radius: .1rem;
 }
-.field input:focus, .field select:focus { border-color: #4db890; }
-.row { display: flex; gap: 12px; }
-.row .field { flex: 1; }
-.btn {
-  display: inline-block; padding: 10px 20px; background: #4db890; color: #fff;
-  border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin-top: 8px; margin-right: 8px;
+.nav .title {
+  height: 100%; display: flex; align-items: center; justify-content: center; gap: 1.2rem;
+  font-size: 3.2rem; font-weight: 600;
 }
-.btn:hover { background: #3da87e; }
-.btn.secondary { background: #2a3a5c; }
-.btn.secondary:hover { background: #3a4a6c; }
-.preview { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow: auto; }
-canvas { border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-.actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid #2a3a5c; }
+.nav .caret {
+  width: 0; height: 0; margin-top: .6rem;
+  border-left: .6rem solid transparent; border-right: .6rem solid transparent;
+  border-top: .8rem solid #BBB;
+}
+.nav .share {
+  position: absolute; right: 3.6rem; top: 0; height: 100%;
+  display: flex; align-items: center; font-size: 3rem; font-weight: 600; color: #4CD89D;
+}
+
+/* ---- 总/周/月/年 ---- */
+.tabs { display: flex; height: 8.6rem; margin-top: 1.4rem; border-top: 1px solid #EEE; flex-shrink: 0; }
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding-top: 1.4rem; gap: 1.1rem;
+}
+.tab .t1 {
+  font-size: 2.8rem; font-weight: bold; line-height: 3.6rem;
+  min-width: 7.6rem; text-align: center;
+}
+.tab .t2 { font-size: 2rem; color: #999; line-height: 1; }
+.tab.on .t1 { background: #4CD89D; color: #fff; border-radius: 1.8rem; }
+.tab.on .t2 { color: #4CD89D; }
+
+/* ---- 年月切换 ---- */
+.monthline {
+  height: 6.4rem; margin-top: 2rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; gap: 3.8rem;
+}
+.monthline .tri { width: 0; height: 0; }
+.monthline .tri.l { border-top: .8rem solid transparent; border-bottom: .8rem solid transparent; border-right: 1.2rem solid #999; }
+.monthline .tri.r { border-top: .8rem solid transparent; border-bottom: .8rem solid transparent; border-left: 1.2rem solid #999; }
+.monthline b { font-size: 2.8rem; font-weight: 500; }
+
+/* ---- 柱状图 ---- */
+.chart { padding: 2.4rem 2rem 0 7.2rem; flex-shrink: 0; }
+.plot { position: relative; height: 31.2rem; }
+.plot .grid {
+  position: absolute; left: 0; right: 0; height: 1px;
+  background: repeating-linear-gradient(90deg, #E5E5E5 0 .6rem, transparent .6rem 1rem);
+}
+.plot .ylab {
+  position: absolute; right: calc(100% + 1rem); transform: translateY(-50%);
+  font-size: 2.2rem; color: #999; line-height: 1;
+}
+.bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: .3rem; }
+.day { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.bar { width: 100%; border-radius: .3rem .3rem 0 0; background: linear-gradient(180deg, #7DDDB5 0%, #4CD89D 100%); }
+.day.peak .bar { background: linear-gradient(180deg, #F5D978 0%, #F0C850 100%); }
+.peaklab {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 2.2rem; color: #D4A020; line-height: 1; white-space: nowrap;
+}
+.xlabs { position: relative; height: 3.6rem; margin-top: 1.4rem; }
+.xlabs span {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: 2.2rem; color: #999; line-height: 1;
+}
+
+/* ---- 统计数字 ---- */
+.stats { padding: 4.6rem 4rem 0; flex-shrink: 0; }
+.srow { display: flex; border-top: 1px solid #EEE; padding: 3.6rem 0 4rem; }
+.scell { flex: 1; }
+.scell + .scell { flex: 0 0 46.5%; }
+.slabel { font-size: 2.6rem; color: #666; line-height: 1; }
+.sval { margin-top: 2.6rem; display: flex; align-items: baseline; line-height: 1; }
+.sval em { font-style: normal; font-size: 6rem; }
+.srow.small .sval em { font-size: 4.8rem; }
+.sval i { font-style: normal; font-size: 2.6rem; color: #666; margin-left: 1.2rem; }
+
+/* ---- 本月 / 上月对比 ---- */
+.cmp {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-evenly;
+  margin: 0 4rem; padding: 2.4rem 0 3rem; border-top: .3rem solid #DDD;
+}
+.cmp .ct { font-size: 2.6rem; line-height: 1.2; }
+.cmp .ch { display: flex; font-size: 2.2rem; color: #999; line-height: 1; }
+.cmp .ch span:first-child { width: 8rem; }
+.cmp .crow { display: flex; align-items: center; font-size: 2.6rem; }
+.cmp .cname { width: 8rem; font-weight: bold; flex-shrink: 0; }
+.cmp .cbar { height: 3.2rem; border-radius: .4rem; flex-shrink: 0; }
+.cmp .crow.this .cbar { background: linear-gradient(90deg, #4EC9A0 0%, #A0DFC8 100%); }
+.cmp .crow.last .cbar { background: linear-gradient(90deg, #C8E6D8 0%, #DFF0E8 100%); }
+.cmp .cval { margin-left: 1.4rem; font-size: 2.6rem; white-space: nowrap; }
+.cmp .cval i { font-style: normal; font-weight: normal; font-family: "PingFang SC", sans-serif; font-size: 2rem; color: #999; margin-left: .4rem; }
+
+/* ================= 编辑面板（生成器自带，非 App 元素） ================= */
+.gen-fab {
+  position: fixed; left: 12px; top: 42%; z-index: 20000;
+  width: 44px; height: 44px; border-radius: 50%; border: 0;
+  background: rgba(76,216,157,.92); color: #fff; font-size: 13px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer;
+}
+body.fabs-hidden .gen-fab { display: none; }
+.gen-panel {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 320px; max-width: 92vw;
+  background: #fff; z-index: 20001; box-shadow: -4px 0 24px rgba(0,0,0,.18);
+  transform: translateX(105%); transition: transform .25s ease;
+  display: flex; flex-direction: column; font-size: 13px; color: #333;
+}
+.gen-panel.show { transform: translateX(0); }
+.gen-panel-head {
+  flex-shrink: 0; padding: 12px 16px; font-size: 15px; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;
+}
+.gen-panel-head button { border: 0; background: none; font-size: 20px; color: #999; cursor: pointer; }
+.gen-panel-body { overflow-y: auto; padding: 8px 16px 24px; -webkit-overflow-scrolling: touch; }
+.gen-panel h3 { font-size: 12px; color: #999; font-weight: 600; margin: 14px 0 2px; letter-spacing: 1px; }
+.gen-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.gen-row label { flex-shrink: 0; color: #666; width: 76px; }
+.gen-row input, .gen-row select {
+  flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; background: #fff; color: #333;
+}
+.gen-row input[readonly] { background: #f5f7f6; color: #2a9d7d; border-style: dashed; }
+.gen-btn {
+  border: 0; background: #4CD89D; color: #fff; border-radius: 6px;
+  padding: 8px 12px; font-size: 13px; cursor: pointer; margin: 10px 8px 0 0;
+}
+.gen-btn.gray { background: #8c9aa5; }
+.gen-tip { color: #999; font-size: 11px; line-height: 1.6; margin-top: 10px; }
+.gen-toast {
+  position: fixed; left: 50%; top: 45%; transform: translateX(-50%); z-index: 30001;
+  background: rgba(0,0,0,.75); color: #fff; font-size: 13px; padding: 8px 14px;
+  border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
+}
+.gen-toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 
-<div class="panel">
-  <h1>Running Editor</h1>
+<div class="screen">
+  <div class="nav">
+    <i class="back"></i>
+    <div class="title">跑步 <i class="caret"></i></div>
+    <span class="share">分享</span>
+  </div>
 
-  <h2>Month</h2>
-  <div class="row">
-    <div class="field"><label>Year</label><input type="number" id="year" value="2026" min="2020" max="2030"></div>
-    <div class="field"><label>Month</label>
-      <select id="month">
-        <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
-        <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-        <option value="7">7</option><option value="8">8</option><option value="9">9</option>
-        <option value="10">10</option><option value="11">11</option><option value="12">12</option>
-      </select>
+  <div class="tabs">
+    <div class="tab"><span class="t1">总</span><span class="t2">总数据</span></div>
+    <div class="tab"><span class="t1">周</span><span class="t2">本周数据</span></div>
+    <div class="tab on"><span class="t1">月</span><span class="t2">本月数据</span></div>
+    <div class="tab"><span class="t1">年</span><span class="t2">一年数据</span></div>
+  </div>
+
+  <div class="monthline">
+    <i class="tri l"></i>
+    <b class="num" id="oMonth">2026/09</b>
+    <i class="tri r"></i>
+  </div>
+
+  <div class="chart">
+    <div class="plot" id="oPlot">
+      <div class="grid" style="top: 0"></div>
+      <div class="grid" style="top: 50%"></div>
+      <div class="grid" style="top: 100%"></div>
+      <span class="ylab num" style="top: 0" id="oYMax">10.0</span>
+      <span class="ylab num" style="top: 50%" id="oYMid">5.0</span>
+      <span class="ylab num" style="top: 100%">0.0</span>
+      <div class="bars" id="oBars"></div>
+    </div>
+    <div class="xlabs num" id="oXlabs"></div>
+  </div>
+
+  <div class="stats">
+    <div class="srow">
+      <div class="scell">
+        <div class="slabel">累计里程</div>
+        <div class="sval num"><em id="oDist">46.98</em><i>公里</i></div>
+      </div>
+      <div class="scell">
+        <div class="slabel">累计次数</div>
+        <div class="sval num"><em id="oCount">13</em><i>次</i></div>
+      </div>
+    </div>
+    <div class="srow">
+      <div class="scell">
+        <div class="slabel">累计时长</div>
+        <div class="sval num"><em id="oTime">10:59:40</em></div>
+      </div>
+      <div class="scell">
+        <div class="slabel">平均配速</div>
+        <div class="sval num"><em id="oPace">14'02"</em></div>
+      </div>
+    </div>
+    <div class="srow small">
+      <div class="scell">
+        <div class="slabel">半马里程次数</div>
+        <div class="sval num"><em id="oHalf">1</em><i>次</i></div>
+      </div>
+      <div class="scell">
+        <div class="slabel">全马里程次数</div>
+        <div class="sval num"><em id="oFull">0</em><i>次</i></div>
+      </div>
     </div>
   </div>
-  <div class="field"><label>Days: <span id="daysDisplay">31</span></label></div>
 
-  <h2>Distance</h2>
-  <div class="row">
-    <div class="field"><label>This month (km)</label><input type="number" id="distThis" value="46.98" step="0.01"></div>
-    <div class="field"><label>Last month (km)</label><input type="number" id="distLast" value="43.07" step="0.01"></div>
-  </div>
-  <div class="field"><label>Diff: <span id="diffDisplay">+3.91</span></label></div>
-
-  <h2>Stats</h2>
-  <div class="row">
-    <div class="field"><label>Run count</label><input type="number" id="runCount" value="13" min="0"></div>
-    <div class="field"><label>Avg pace</label><input type="text" id="avgPace" value="13'56&quot;"></div>
-  </div>
-  <div class="field"><label>Total time (HH:MM:SS)</label><input type="text" id="totalTime" value="10:59:40"></div>
-  <div class="row">
-    <div class="field"><label>Half marathon</label><input type="number" id="halfMarathon" value="1" min="0"></div>
-    <div class="field"><label>Full marathon</label><input type="number" id="fullMarathon" value="0" min="0"></div>
-  </div>
-
-  <h2>Status Bar</h2>
-  <div class="row">
-    <div class="field"><label>Time</label><input type="text" id="statusTime" value="10:45"></div>
-    <div class="field"><label>Battery %</label><input type="number" id="battery" value="67" min="0" max="100"></div>
-  </div>
-
-  <h2>Chart</h2>
-  <div class="field">
-    <label>Active days ratio</label>
-    <input type="range" id="activeDays" min="30" max="90" value="65">
-    <span id="activeDaysDisplay">65%</span>
-  </div>
-  <button class="btn secondary" onclick="regenerateChart()">Randomize</button>
-
-  <div class="actions">
-    <button class="btn" onclick="exportPNG()">Export PNG</button>
+  <div class="cmp">
+    <p class="ct" id="oCmpTitle">本月跑步里程比上月多 3.91 公里</p>
+    <div class="ch"><span>月次</span><span>里程</span></div>
+    <div class="crow this">
+      <span class="cname">本月</span>
+      <span class="cbar" id="oBarThis"></span>
+      <span class="cval num"><span id="oValThis">46.98</span><i>公里</i></span>
+    </div>
+    <div class="crow last">
+      <span class="cname">上月</span>
+      <span class="cbar" id="oBarLast"></span>
+      <span class="cval num"><span id="oValLast">43.07</span><i>公里</i></span>
+    </div>
   </div>
 </div>
 
-<div class="preview">
-  <canvas id="canvas" width="750" height="1640"></canvas>
-</div>
+<button class="gen-fab" id="genFab">编辑</button>
+
+<section class="gen-panel" id="genPanel">
+  <div class="gen-panel-head"><span>月数据编辑</span><button id="genClose">×</button></div>
+  <div class="gen-panel-body">
+    <h3>月份</h3>
+    <div class="gen-row"><label>年</label><input type="number" id="inYear" min="2020" max="2035"></div>
+    <div class="gen-row"><label>月</label>
+      <select id="inMonth">
+        <option>1</option><option>2</option><option>3</option><option>4</option>
+        <option>5</option><option>6</option><option>7</option><option>8</option>
+        <option>9</option><option>10</option><option>11</option><option>12</option>
+      </select>
+    </div>
+
+    <h3>里程</h3>
+    <div class="gen-row"><label>本月公里</label><input type="number" id="inDist" step="0.01"></div>
+    <div class="gen-row"><label>上月公里</label><input type="number" id="inLast" step="0.01"></div>
+
+    <h3>统计</h3>
+    <div class="gen-row"><label>累计次数</label><input type="number" id="inCount" min="1" max="31"></div>
+    <div class="gen-row"><label>累计时长</label><input type="text" id="inTime" placeholder="HH:MM:SS"></div>
+    <div class="gen-row"><label>平均配速</label><input type="text" id="inPace" readonly></div>
+    <div class="gen-row"><label>半马次数</label><input type="number" id="inHalf" min="0" max="31"></div>
+    <div class="gen-row"><label>全马次数</label><input type="number" id="inFull" min="0" max="31"></div>
+
+    <button class="gen-btn" id="btnRandom">随机一整套</button>
+    <button class="gen-btn gray" id="btnRedist">只换分布</button>
+
+    <p class="gen-tip">
+      配速由「累计时长 ÷ 本月公里」算出，累计次数就是柱子根数；半马/全马次数会在图里生成对应长度的那几根柱子（≥21.10 / ≥42.20 公里），总和始终等于本月公里。<br>
+      截图：把按钮闲置 3 秒自动隐藏后用系统截屏，轻点页面可唤出。加到主屏幕打开即为全屏，状态栏是手机自己的。
+    </p>
+  </div>
+</section>
+
+<div class="gen-toast" id="genToast"></div>
 
 <script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const W = 750, H = 1640;
+'use strict';
+/* 半马 21.0975 / 全马 42.195 公里；柱子的取值区间，两位小数，避免四舍五入后跌破半马/全马线 */
+var HALF_MIN = 21.10, HALF_MAX = 42, FULL_MIN = 42.20, FULL_MAX = 80, DAY_MIN = 0.5, DAY_MAX = 20.9;
+var STORE_KEY = 'runningMonthlyGen.v1';
+var $ = function (id) { return document.getElementById(id); };
 
-const C = {
-  bg: '#FFFFFF',
-  dark: '#1A1A1A',
-  text: '#333333',
-  gray: '#666666',
-  lightGray: '#999999',
-  divider: '#EEEEEE',
-  green: '#4CD89D',
-  greenLight: '#7DDDB5',
-  yellow: '#F0C850',
-  yellowLight: '#F5D978',
-  blue: '#7BA4E8',
-  blueDark: '#5B8AD8',
-};
+var state = load();
+var daily = [];
 
-const F = {
-  num:    (s) => `bold ${s}px "DIN Alternate", "Helvetica Neue", sans-serif`,
-  cn:     (s) => `${s}px "PingFang SC", "Hiragino Sans GB", sans-serif`,
-  cnMed:  (s) => `500 ${s}px "PingFang SC", "Hiragino Sans GB", sans-serif`,
-  cnBold: (s) => `bold ${s}px "PingFang SC", "Hiragino Sans GB", sans-serif`,
-  sf:     (s) => `600 ${s}px -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif`,
-};
+function defaults() {
+  var now = new Date();
+  return {
+    year: now.getFullYear(), month: now.getMonth() + 1,
+    dist: 46.98, last: 43.07, count: 13,
+    time: '10:59:40', half: 1, full: 0, seed: 20260915
+  };
+}
+function load() {
+  try {
+    var s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (s && s.dist) return Object.assign(defaults(), s);
+  } catch (e) {}
+  return defaults();
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
 
-let dailyData = [];
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function round2(v) { return Math.round(v * 100) / 100; }
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
-function getDaysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function parseHMS(str) {
+  var p = String(str).split(/[:：]/).map(Number);
+  if (p.length === 3) return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
+  if (p.length === 2) return (p[0] || 0) * 60 + (p[1] || 0);
+  return 0;
+}
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return pad(Math.floor(sec / 3600)) + ':' + pad(Math.floor(sec / 60) % 60) + ':' + pad(sec % 60);
+}
+function fmtPace(sec, km) {
+  if (!(km > 0) || !(sec > 0)) return "0'00\"";
+  var p = sec / km;
+  if (p >= 3600) return ">60'00\"";
+  return Math.floor(p / 60) + "'" + pad(Math.round(p % 60)) + '"';
+}
 
-function generateDailyData() {
-  const days = getDaysInMonth(getNum('year'), getNum('month'));
-  const total = getNum('distThis');
-  const ratio = getNum('activeDays') / 100;
-  const data = new Array(days).fill(0);
-  const numActive = Math.max(1, Math.round(days * ratio));
-  const idx = Array.from({length: days}, (_, i) => i);
-  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-  const active = idx.slice(0, numActive).sort((a,b) => a - b);
-  let rem = total;
-  for (let i = 0; i < active.length - 1; i++) {
-    const avg = rem / (active.length - i);
-    const v = Math.max(0.3, avg * (0.2 + Math.random() * 1.6));
-    data[active[i]] = Math.min(Math.round(v * 100) / 100, rem - 0.3 * (active.length - i - 1));
-    rem -= data[active[i]];
+/* seeded rng：同一套数据重绘时分布保持不变 */
+function makeRng(seed) {
+  var a = seed | 0;
+  return function () {
+    a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* n 个在 [min,max] 区间、和恰为 total 的随机值 */
+function spread(total, n, min, max, rng) {
+  if (n <= 0) return [];
+  var w = [], sw = 0, i;
+  for (i = 0; i < n; i++) { w.push(0.35 + rng()); sw += w[i]; }
+  var vals = w.map(function (x) { return min + (x / sw) * (total - n * min); });
+  for (var pass = 0; pass < 10; pass++) {
+    var over = 0;
+    vals = vals.map(function (v) { if (v > max) { over += v - max; return max; } return v; });
+    if (over < 1e-9) break;
+    var room = vals.map(function (v) { return max - v; });
+    var totalRoom = room.reduce(function (a, b) { return a + b; }, 0);
+    if (totalRoom < 1e-9) break;
+    vals = vals.map(function (v, k) { return v + over * room[k] / totalRoom; });
   }
-  if (active.length > 0) data[active[active.length - 1]] = Math.round(Math.max(0, rem) * 100) / 100;
-  dailyData = data;
+  return vals;
 }
 
-function regenerateChart() { generateDailyData(); draw(); }
-function getVal(id) { return document.getElementById(id).value; }
-function getNum(id) { return +document.getElementById(id).value; }
+/* 把本月公里拆成每天的里程：半马/全马次数决定其中几根柱子必须够长 */
+function buildDaily() {
+  var days = daysInMonth(state.year, state.month);
+  var full = clamp(Math.round(state.full) || 0, 0, days);
+  var half = clamp(Math.round(state.half) || 0, 0, days - full);
+  var count = clamp(Math.round(state.count) || 1, full + half || 1, days);
 
-// ---- Canvas helpers (no ctx.roundRect - use manual paths for compatibility) ----
-function rrPath(x, y, w, h, r) {
-  r = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-function fillRR(x, y, w, h, r) { if (w <= 0 || h <= 0) return; rrPath(x, y, w, h, r); ctx.fill(); }
-function strokeRR(x, y, w, h, r) { if (w <= 0 || h <= 0) return; rrPath(x, y, w, h, r); ctx.stroke(); }
+  // 普通天不触到半马线，半马天 21.10~42.00，全马天 42.20 起
+  var others = count - full - half;
+  var floorCap = others * DAY_MIN + half * HALF_MIN + full * FULL_MIN;
+  var ceilCap = others * DAY_MAX + half * HALF_MAX + full * FULL_MAX;
+  var total = clamp(round2(state.dist) || 0, Math.ceil(floorCap * 100) / 100, Math.floor(ceilCap * 100) / 100);
 
-// ==================== iOS Status Bar ====================
-function drawStatusBar() {
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 0, W, 54);
-  const cy = 27;
+  state.full = full; state.half = half; state.count = count; state.dist = total;
 
-  // Left: Time + location arrow (matching real iOS)
-  ctx.fillStyle = C.dark;
-  ctx.font = F.sf(34);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(getVal('statusTime'), 32, cy);
-  // Location arrow (larger, matching iOS)
-  const tw = ctx.measureText(getVal('statusTime')).width;
-  ctx.save();
-  ctx.translate(32 + tw + 14, cy - 2);
-  ctx.rotate(-Math.PI / 4);
-  ctx.beginPath();
-  ctx.moveTo(0, -11);
-  ctx.lineTo(8, 11);
-  ctx.lineTo(0, 5);
-  ctx.lineTo(-8, 11);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  var rng = makeRng(state.seed);
+  var specials = [];
+  var i;
+  for (i = 0; i < full; i++) specials.push({ min: FULL_MIN, max: FULL_MAX, v: FULL_MIN });
+  for (i = 0; i < half; i++) specials.push({ min: HALF_MIN, max: HALF_MAX, v: HALF_MIN });
+  var reserved = specials.reduce(function (a, b) { return a + b.v; }, 0);
 
-  // Right cluster: signal bars → "5G" text → battery
-  const iconGap = 10;
+  var rest = total - reserved;
+  var otherVals = others > 0 ? spread(Math.min(rest, others * DAY_MAX), others, DAY_MIN, DAY_MAX, rng) : [];
+  var used = otherVals.reduce(function (a, b) { return a + b; }, 0);
 
-  // Battery (rightmost): rounded rect, fill flush with outline, tiny cap
-  const battery = getNum('battery');
-  const bw = 40, bh = 22;
-  const bx = W - 26 - bw, by = cy - bh / 2;
-  const br = 6;
-  // Gray filled background (full battery shape)
-  ctx.fillStyle = '#D1D1D6';
-  fillRR(bx, by, bw, bh, br);
-  // Tiny cap on right (also gray)
-  ctx.fillStyle = '#D1D1D6';
-  fillRR(bx + bw + 1.5, cy - 3, 3, 6, 1.5);
-  // Dark fill from left (charge level)
-  const fillW = Math.max(0, Math.round(bw * battery / 100));
-  if (fillW > 0) {
-    ctx.save();
-    rrPath(bx, by, bw, bh, br);
-    ctx.clip();
-    ctx.fillStyle = C.dark;
-    ctx.fillRect(bx, by, fillW, bh);
-    ctx.restore();
+  // 普通天装不下的部分加到半马/全马那几根上（它们还有余量）
+  var leftover = rest - used;
+  for (i = 0; i < specials.length && leftover > 1e-9; i++) {
+    var room = specials[i].max - specials[i].v;
+    var add = Math.min(room, leftover);
+    specials[i].v += add;
+    leftover -= add;
   }
-  // Percentage text — white on dark, dark on gray
-  ctx.font = `bold 16px -apple-system, "SF Pro Display", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(battery.toString(), bx + bw / 2, cy + 1);
 
-  // "5G" + small "A" text (middle)
-  ctx.fillStyle = C.dark;
-  ctx.textBaseline = 'middle';
-  const fgRight = bx - iconGap;
-  // Small "A" first (to measure position)
-  ctx.font = `bold 16px -apple-system, "SF Pro Display", sans-serif`;
-  const aW = ctx.measureText('A').width;
-  ctx.textAlign = 'right';
-  ctx.fillText('A', fgRight, cy + 2);
-  // "5G" before it
-  ctx.font = `bold 24px -apple-system, "SF Pro Display", sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.fillText('5G', fgRight - aW - 1, cy + 1);
-  const fgMainW = ctx.measureText('5G').width;
+  var vals = specials.map(function (s) { return round2(s.v); })
+    .concat(otherVals.map(function (v) { return round2(v); }));
 
-  // Signal bars (leftmost): 4 thin bars like real iOS
-  const fgW = fgMainW + aW + 1;
-  const sigBot = cy + bh / 2;
-  const barHeights = [7, 12, 17, 22];
-  const barW = 4, barGap = 3;
-  const totalSigW = 4 * barW + 3 * barGap;
-  const sigX = fgRight - fgW - iconGap - totalSigW;
-  ctx.fillStyle = C.dark;
-  for (let i = 0; i < 4; i++) {
-    fillRR(sigX + i * (barW + barGap), sigBot - barHeights[i], barW, barHeights[i], 1.5);
-  }
-}
-
-// ==================== Nav Bar ====================
-function drawNavBar() {
-  const y = 68;
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, y, W, 52);
-
-  // Back chevron
-  ctx.strokeStyle = '#BBBBBB';
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(46, y + 18);
-  ctx.lineTo(34, y + 28);
-  ctx.lineTo(46, y + 38);
-  ctx.stroke();
-
-  // Title
-  ctx.fillStyle = C.dark;
-  ctx.font = F.cnBold(32);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('跑步', W / 2 - 8, y + 28);
-
-  // Dropdown triangle
-  ctx.fillStyle = '#BBBBBB';
-  ctx.beginPath();
-  const tx = W / 2 + 28;
-  ctx.moveTo(tx, y + 22);
-  ctx.lineTo(tx + 12, y + 22);
-  ctx.lineTo(tx + 6, y + 30);
-  ctx.closePath();
-  ctx.fill();
-
-  // "分享"
-  ctx.fillStyle = C.green;
-  ctx.font = F.cnBold(30);
-  ctx.textAlign = 'right';
-  ctx.fillText('分享', W - 36, y + 28);
-}
-
-// ==================== Tab Bar ====================
-function drawTabBar() {
-  const y = 134;
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, y, W, 86);
-  // Top divider
-  ctx.fillStyle = C.divider;
-  ctx.fillRect(0, y, W, 1);
-
-  const tabs = ['总', '周', '月', '年'];
-  const subs = ['总数据', '本周数据', '本月数据', '一年数据'];
-  const tabW = W / 4;
-
-  for (let i = 0; i < 4; i++) {
-    const cx = tabW * i + tabW / 2;
-    if (i === 2) {
-      // Active: green pill
-      ctx.fillStyle = C.green;
-      fillRR(cx - 38, y + 14, 76, 36, 18);
-      ctx.fillStyle = '#FFF';
-      ctx.font = F.cnBold(28);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(tabs[i], cx, y + 31);
-      ctx.fillStyle = C.green;
-      ctx.font = F.cn(20);
-      ctx.fillText(subs[i], cx, y + 66);
-    } else {
-      ctx.fillStyle = C.dark;
-      ctx.font = F.cnBold(28);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(tabs[i], cx, y + 31);
-      ctx.fillStyle = C.lightGray;
-      ctx.font = F.cn(20);
-      ctx.fillText(subs[i], cx, y + 66);
+  // 四舍五入的零头补到余量最大的那天，保证总和严格等于本月公里
+  var drift = round2(total - vals.reduce(function (a, b) { return a + b; }, 0));
+  if (Math.abs(drift) > 0.001) {
+    var limit = vals.map(function (v, k) { return k < specials.length ? specials[k] : { min: DAY_MIN, max: DAY_MAX }; });
+    for (i = 0; i < vals.length; i++) {
+      var next = round2(vals[i] + drift);
+      if (next >= limit[i].min && next <= limit[i].max) { vals[i] = next; break; }
     }
   }
+
+  // 随机落到月内的哪几天
+  var pool = [];
+  for (i = 1; i <= days; i++) pool.push(i);
+  for (i = pool.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  var picked = pool.slice(0, vals.length).sort(function (a, b) { return a - b; });
+  daily = new Array(days).fill(0);
+  picked.forEach(function (d, k) { daily[d - 1] = vals[k]; });
 }
 
-// ==================== Month Title ====================
-function drawMonthTitle() {
-  const y = 240;
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, y, W, 64);
-
-  const yr = getVal('year');
-  const mo = getVal('month').padStart(2, '0');
-
-  ctx.fillStyle = C.dark;
-  ctx.font = F.cnMed(28);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${yr}/${mo}`, W / 2, y + 32);
-
-  // Left triangle
-  ctx.fillStyle = C.lightGray;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 - 78, y + 32);
-  ctx.lineTo(W / 2 - 66, y + 24);
-  ctx.lineTo(W / 2 - 66, y + 40);
-  ctx.closePath();
-  ctx.fill();
-  // Right triangle
-  ctx.beginPath();
-  ctx.moveTo(W / 2 + 78, y + 32);
-  ctx.lineTo(W / 2 + 66, y + 24);
-  ctx.lineTo(W / 2 + 66, y + 40);
-  ctx.closePath();
-  ctx.fill();
+function niceMax(peak) {
+  if (!(peak > 0)) return 10;
+  if (peak <= 10) return Math.ceil(peak / 2) * 2;
+  if (peak <= 50) return Math.ceil(peak / 5) * 5;
+  return Math.ceil(peak / 10) * 10;
 }
 
-// ==================== Bar Chart ====================
-function drawChart() {
-  const days = getDaysInMonth(getNum('year'), getNum('month'));
-  if (dailyData.length !== days) generateDailyData();
+function renderChart() {
+  var max = niceMax(Math.max.apply(null, daily.concat([0])));
+  $('oYMax').textContent = max.toFixed(1);
+  $('oYMid').textContent = (max / 2).toFixed(1);
 
-  const L = 72, R = W - 20, T = 328, B = 640;
-  const cW = R - L, cH = B - T;
+  var peak = 0, peakIdx = -1;
+  daily.forEach(function (v, i) { if (v > peak) { peak = v; peakIdx = i; } });
 
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 304, W, 390);
-
-  const maxVal = Math.max(...dailyData, 1);
-  // Nice scale: round up to nearest even number for cleaner labels
-  const niceMax = Math.ceil(maxVal / 2) * 2;
-  const midVal = niceMax / 2;
-
-  // Y-axis + dashed grid
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.font = F.cn(22);
-
-  [0, midVal, niceMax].forEach(lv => {
-    const ly = B - (lv / niceMax) * cH;
-    ctx.fillStyle = C.lightGray;
-    ctx.fillText(lv.toFixed(1), L - 10, ly);
-    ctx.strokeStyle = '#E5E5E5';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(L, ly);
-    ctx.lineTo(R, ly);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  var bars = $('oBars');
+  bars.innerHTML = '';
+  daily.forEach(function (v, i) {
+    var col = document.createElement('div');
+    col.className = 'day' + (i === peakIdx ? ' peak' : '');
+    var h = Math.min(v / max, 1) * 100;
+    if (v > 0) {
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = h + '%';
+      col.appendChild(bar);
+    }
+    if (i === peakIdx && v > 0) {
+      var lab = document.createElement('span');
+      lab.className = 'peaklab num';
+      lab.style.bottom = 'calc(' + h + '% + .6rem)';
+      lab.textContent = v.toFixed(2);
+      col.appendChild(lab);
+    }
+    bars.appendChild(col);
   });
 
-  // Find max day
-  let maxDay = 0, maxDayVal = 0;
-  for (let i = 0; i < days; i++) {
-    if (dailyData[i] > maxDayVal) { maxDayVal = dailyData[i]; maxDay = i; }
-  }
-
-  // Draw bars
-  const gap = 3;
-  const barW = Math.max(3, (cW - gap * (days - 1)) / days);
-
-  for (let i = 0; i < days; i++) {
-    if (dailyData[i] <= 0) continue;
-    const bx = L + i * (barW + gap);
-    const bh = (dailyData[i] / niceMax) * cH;
-    const by = B - bh;
-    const r = Math.min(barW / 2, 3);
-
-    const grad = ctx.createLinearGradient(bx, by, bx, B);
-    if (i === maxDay) {
-      grad.addColorStop(0, C.yellowLight);
-      grad.addColorStop(1, C.yellow);
-    } else {
-      grad.addColorStop(0, C.greenLight);
-      grad.addColorStop(1, C.green);
-    }
-    ctx.fillStyle = grad;
-    fillRR(bx, by, barW, bh, r);
-  }
-
-  // Max value label (yellow color for max)
-  if (maxDayVal > 0) {
-    const bx = L + maxDay * (barW + gap);
-    const bh = (maxDayVal / niceMax) * cH;
-    const by = B - bh;
-    ctx.fillStyle = '#D4A020';
-    ctx.font = F.num(22);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(maxDayVal.toFixed(2), bx + barW / 2, by - 6);
-  }
-
-  // X-axis labels
-  ctx.fillStyle = C.lightGray;
-  ctx.font = F.cn(22);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  [1, 6, 11, 16, 21, 26, 31].filter(d => d <= days).forEach(d => {
-    ctx.fillText(d.toString(), L + (d - 1) * (barW + gap) + barW / 2, B + 14);
+  var xl = $('oXlabs');
+  xl.innerHTML = '';
+  [1, 6, 11, 16, 21, 26, 31].filter(function (d) { return d <= daily.length; }).forEach(function (d) {
+    var s = document.createElement('span');
+    // 柱子按 flex 等分，第 d 根的中心即 (d-0.5)/days
+    s.style.left = ((d - 0.5) / daily.length * 100) + '%';
+    s.textContent = d;
+    xl.appendChild(s);
   });
 }
 
-// ==================== Stats ====================
-function drawStats() {
-  const y0 = 760;
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, y0, W, 540);
+function render() {
+  buildDaily();
 
-  const dist = (+getVal('distThis')).toFixed(2);
-  const count = getVal('runCount');
-  const time = getVal('totalTime');
-  const pace = getVal('avgPace');
-  const halfM = getVal('halfMarathon');
-  const fullM = getVal('fullMarathon');
-  const LX = 40, RX = 400;
+  var sec = parseHMS(state.time);
+  $('oMonth').textContent = state.year + '/' + pad(state.month);
+  $('oDist').textContent = state.dist.toFixed(2);
+  $('oCount').textContent = state.count;
+  $('oTime').textContent = fmtHMS(sec);
+  $('oPace').textContent = fmtPace(sec, state.dist);
+  $('oHalf').textContent = state.half;
+  $('oFull').textContent = state.full;
 
-  // Divider above
-  ctx.fillStyle = C.divider;
-  ctx.fillRect(LX, y0, W - 2 * LX, 1);
+  var diff = state.dist - state.last;
+  $('oCmpTitle').textContent = '本月跑步里程比上月' + (diff >= 0 ? '多' : '少') + ' ' +
+    Math.abs(diff).toFixed(2) + ' 公里';
+  var maxD = Math.max(state.dist, state.last, 0.01);
+  $('oBarThis').style.width = Math.max(4, state.dist / maxD * 56) + '%';
+  $('oBarLast').style.width = Math.max(4, state.last / maxD * 56) + '%';
+  $('oValThis').textContent = state.dist.toFixed(2);
+  $('oValLast').textContent = state.last.toFixed(2);
 
-  // ---- Row 1 ----
-  let y = y0 + 38;
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('累计里程', LX, y);
-  ctx.fillText('累计次数', RX, y);
-
-  y += 52;
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(60);
-  const dw = ctx.measureText(dist).width;
-  ctx.fillText(dist, LX, y);
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('公里', LX + dw + 12, y + 26);
-
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(60);
-  const cw = ctx.measureText(count).width;
-  ctx.fillText(count, RX, y);
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('次', RX + cw + 12, y + 26);
-
-  y += 100;
-  ctx.fillStyle = C.divider;
-  ctx.fillRect(LX, y, W - 2 * LX, 1);
-
-  // ---- Row 2 ----
-  y += 34;
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('累计时长', LX, y);
-  ctx.fillText('平均配速', RX, y);
-
-  y += 52;
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(60);
-  ctx.fillText(time, LX, y);
-  ctx.fillText(pace, RX, y);
-
-  y += 100;
-  ctx.fillStyle = C.divider;
-  ctx.fillRect(LX, y, W - 2 * LX, 1);
-
-  // ---- Row 3 ----
-  y += 34;
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('半马里程次数', LX, y);
-  ctx.fillText('全马里程次数', RX, y);
-
-  y += 52;
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(48);
-  const hw = ctx.measureText(halfM).width;
-  ctx.fillText(halfM, LX, y);
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('次', LX + hw + 10, y + 16);
-
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(48);
-  const fw = ctx.measureText(fullM).width;
-  ctx.fillText(fullM, RX, y);
-  ctx.fillStyle = C.gray;
-  ctx.font = F.cn(26);
-  ctx.fillText('次', RX + fw + 10, y + 16);
-
-  return y + 76;
+  renderChart();
+  syncPanel();
+  save();
 }
 
-// ==================== Comparison ====================
-function drawComparison(startY) {
-  const y = startY;
-  const distThis = getNum('distThis');
-  const distLast = getNum('distLast');
-  const diff = distThis - distLast;
-
-  // Fill remaining space to canvas bottom
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, y, W, H - y);
-
-  // Divider line (gray)
-  ctx.fillStyle = '#DDDDDD';
-  ctx.fillRect(40, y, W - 80, 3);
-
-  // Spread content evenly in remaining space
-  const contentH = H - y - 3;
-  const ty = y + 3 + contentH * 0.08;
-
-  // Title
-  ctx.fillStyle = C.dark;
-  ctx.font = F.cn(26);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  const diffAbs = Math.abs(diff).toFixed(2);
-  const word = diff >= 0 ? '多' : '少';
-  ctx.fillText(`本月跑步里程比上月${word} ${diffAbs} 公里`, 40, ty);
-
-  // Header
-  const hy = ty + contentH * 0.16;
-  ctx.fillStyle = C.lightGray;
-  ctx.font = F.cn(22);
-  ctx.fillText('月次', 40, hy);
-  ctx.fillText('里程', 120, hy);
-
-  const barX = 120, barMaxW = 420;
-  const maxD = Math.max(distThis, distLast, 1);
-
-  // This month bar
-  const r1y = hy + contentH * 0.16;
-  ctx.fillStyle = C.dark;
-  ctx.font = F.cnBold(26);
-  ctx.fillText('本月', 40, r1y);
-
-  const b1w = Math.max(10, (distThis / maxD) * barMaxW);
-  const g1 = ctx.createLinearGradient(barX, 0, barX + b1w, 0);
-  g1.addColorStop(0, '#4EC9A0');
-  g1.addColorStop(1, '#A0DFC8');
-  ctx.fillStyle = g1;
-  fillRR(barX, r1y - 2, b1w, 32, 4);
-
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(26);
-  ctx.textAlign = 'left';
-  const v1x = barX + b1w + 14;
-  ctx.fillText(distThis.toFixed(2), v1x, r1y + 2);
-  const v1w = ctx.measureText(distThis.toFixed(2)).width;
-  ctx.fillStyle = C.lightGray;
-  ctx.font = F.cn(20);
-  ctx.fillText('公里', v1x + v1w + 4, r1y + 6);
-
-  // Last month bar — positioned near bottom
-  const r2y = r1y + contentH * 0.2;
-  ctx.fillStyle = C.dark;
-  ctx.font = F.cnBold(26);
-  ctx.textAlign = 'left';
-  ctx.fillText('上月', 40, r2y);
-
-  const b2w = Math.max(10, (distLast / maxD) * barMaxW);
-  const g2 = ctx.createLinearGradient(barX, 0, barX + b2w, 0);
-  g2.addColorStop(0, '#C8E6D8');
-  g2.addColorStop(1, '#DFF0E8');
-  ctx.fillStyle = g2;
-  fillRR(barX, r2y - 2, b2w, 32, 4);
-
-  ctx.fillStyle = C.dark;
-  ctx.font = F.num(26);
-  const v2x = barX + b2w + 14;
-  ctx.fillText(distLast.toFixed(2), v2x, r2y + 2);
-  const v2w = ctx.measureText(distLast.toFixed(2)).width;
-  ctx.fillStyle = C.lightGray;
-  ctx.font = F.cn(20);
-  ctx.fillText('公里', v2x + v2w + 4, r2y + 6);
+function syncPanel() {
+  $('inYear').value = state.year;
+  $('inMonth').value = state.month;
+  $('inDist').value = state.dist.toFixed(2);
+  $('inLast').value = state.last.toFixed(2);
+  $('inCount').value = state.count;
+  $('inTime').value = fmtHMS(parseHMS(state.time));
+  $('inPace').value = fmtPace(parseHMS(state.time), state.dist);
+  $('inHalf').value = state.half;
+  $('inFull').value = state.full;
 }
 
-// ==================== Main ====================
-function draw() {
-  ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  document.getElementById('daysDisplay').textContent = getDaysInMonth(getNum('year'), getNum('month'));
-  const d = getNum('distThis') - getNum('distLast');
-  document.getElementById('diffDisplay').textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} km`;
-  document.getElementById('activeDaysDisplay').textContent = getNum('activeDays') + '%';
-
-  drawStatusBar();
-  drawNavBar();
-  drawTabBar();
-  drawMonthTitle();
-  drawChart();
-  const ey = drawStats();
-  drawComparison(ey);
+/* 一次随机出互相自洽的一整套：里程/次数/时长/半马/全马/分布 */
+function randomize() {
+  var rng = makeRng((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0);
+  var days = daysInMonth(state.year, state.month);
+  var full = rng() < 0.08 ? 1 : 0;
+  var half = full ? (rng() < 0.4 ? 1 : 0) : (rng() < 0.3 ? 1 : (rng() < 0.08 ? 2 : 0));
+  var count = clamp(Math.round(8 + rng() * 12), full + half + 2, days);
+  var normal = count - full - half;
+  var total = round2(full * (FULL_MIN + rng() * 2) + half * (HALF_MIN + rng() * 4) +
+    normal * (1.8 + rng() * 2.6));
+  var pace = 420 + rng() * 360;           // 7'00" ~ 13'00" 每公里
+  state.full = full;
+  state.half = half;
+  state.count = count;
+  state.dist = total;
+  state.time = fmtHMS(total * pace);
+  state.last = round2(total * (0.45 + rng() * 1.1));
+  state.seed = Math.floor(rng() * 0x7fffffff);
+  render();
 }
 
-function exportPNG() {
-  const a = document.createElement('a');
-  a.download = `running_${getVal('year')}_${getVal('month').padStart(2,'0')}.png`;
-  a.href = canvas.toDataURL('image/png');
-  a.click();
+/* ---------- 编辑面板 ---------- */
+function bindNum(id, key, min, max, isFloat) {
+  $(id).addEventListener('change', function () {
+    var v = isFloat ? parseFloat(this.value) : parseInt(this.value, 10);
+    if (isNaN(v)) { syncPanel(); return; }
+    state[key] = clamp(isFloat ? round2(v) : v, min, max);
+    render();
+  });
 }
-
-document.querySelectorAll('input, select').forEach(el => {
-  el.addEventListener('input', draw);
-  el.addEventListener('change', draw);
+bindNum('inYear', 'year', 2020, 2035, false);
+bindNum('inDist', 'dist', 0.5, 2000, true);
+bindNum('inLast', 'last', 0, 2000, true);
+bindNum('inCount', 'count', 1, 31, false);
+bindNum('inHalf', 'half', 0, 31, false);
+bindNum('inFull', 'full', 0, 31, false);
+$('inMonth').addEventListener('change', function () { state.month = +this.value; render(); });
+$('inTime').addEventListener('change', function () { state.time = fmtHMS(parseHMS(this.value)); render(); });
+$('btnRandom').addEventListener('click', randomize);
+$('btnRedist').addEventListener('click', function () {
+  state.seed = (state.seed * 1103515245 + 12345) & 0x7fffffff;
+  render();
 });
 
-generateDailyData();
-draw();
+/* ---------- 截图用：按钮闲置 3 秒自动隐藏，轻点页面唤出 ---------- */
+var fabTimer, toastTimer;
+function toast(msg) {
+  var t = $('genToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1800);
+}
+function scheduleFabHide() {
+  clearTimeout(fabTimer);
+  fabTimer = setTimeout(function () {
+    if ($('genPanel').classList.contains('show')) return;
+    document.body.classList.add('fabs-hidden');
+    var n = +(localStorage.getItem('runningFabHint') || 0);
+    if (n < 2) { localStorage.setItem('runningFabHint', n + 1); toast('按钮已隐藏，轻点页面可唤出'); }
+  }, 3000);
+}
+function showFabs() { document.body.classList.remove('fabs-hidden'); scheduleFabHide(); }
+
+$('genFab').addEventListener('click', function () {
+  $('genPanel').classList.add('show');
+  clearTimeout(fabTimer);
+});
+$('genClose').addEventListener('click', function () {
+  $('genPanel').classList.remove('show');
+  scheduleFabHide();
+});
+document.addEventListener('click', function (e) {
+  if (e.target.closest('.gen-fab, .gen-panel')) return;
+  if (document.body.classList.contains('fabs-hidden')) showFabs();
+});
+
+render();
+scheduleFabHide();
 </script>
 </body>
 </html>
