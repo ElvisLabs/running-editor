@@ -159,6 +159,13 @@ body.fabs-hidden .gen-fab { display: none; }
   padding: 6px 8px; font-size: 13px; background: #fff; color: #333;
 }
 .gen-row input[readonly] { background: #f5f7f6; color: #2a9d7d; border-style: dashed; }
+.gen-row input.locked { border-color: #4CD89D; background: #f3fbf8; }
+.gen-lock {
+  flex: 0 0 auto; width: 32px; height: 30px; border: 1px solid #ddd; border-radius: 6px;
+  background: #fff; color: #bbb; font-size: 12px; cursor: pointer; padding: 0;
+}
+.gen-lock.on { background: #4CD89D; border-color: #4CD89D; color: #fff; }
+.gen-tag { flex: 0 0 auto; width: 32px; text-align: center; font-size: 11px; color: #4CD89D; }
 .gen-btn {
   border: 0; background: #4CD89D; color: #fff; border-radius: 6px;
   padding: 8px 12px; font-size: 13px; cursor: pointer; margin: 10px 8px 0 0;
@@ -273,20 +280,22 @@ body.fabs-hidden .gen-fab { display: none; }
     </div>
 
     <h3>里程</h3>
-    <div class="gen-row"><label>本月公里</label><input type="number" id="inDist" step="0.01"></div>
-    <div class="gen-row"><label>上月公里</label><input type="number" id="inLast" step="0.01"></div>
+    <div class="gen-row"><label>本月公里</label><input type="number" id="inDist" step="0.01"><button class="gen-lock" data-key="dist" title="锁定：随机时保持不变">锁</button></div>
+    <div class="gen-row"><label>上月公里</label><input type="number" id="inLast" step="0.01"><span class="gen-tag">手填</span></div>
 
     <h3>统计</h3>
-    <div class="gen-row"><label>累计次数</label><input type="number" id="inCount" min="1" max="31"></div>
-    <div class="gen-row"><label>累计时长</label><input type="text" id="inTime" placeholder="HH:MM:SS"></div>
-    <div class="gen-row"><label>平均配速</label><input type="text" id="inPace" readonly></div>
-    <div class="gen-row"><label>半马次数</label><input type="number" id="inHalf" min="0" max="31"></div>
-    <div class="gen-row"><label>全马次数</label><input type="number" id="inFull" min="0" max="31"></div>
+    <div class="gen-row"><label>累计次数</label><input type="number" id="inCount" min="1" max="31"><button class="gen-lock" data-key="count" title="锁定：随机时保持不变">锁</button></div>
+    <div class="gen-row"><label>累计时长</label><input type="text" id="inTime" placeholder="HH:MM:SS"><button class="gen-lock" data-key="time" title="锁定：随机时保持不变">锁</button></div>
+    <div class="gen-row"><label>平均配速</label><input type="text" id="inPace" readonly><span class="gen-tag">自动</span></div>
+    <div class="gen-row"><label>半马次数</label><input type="number" id="inHalf" min="0" max="31"><button class="gen-lock" data-key="half" title="锁定：随机时保持不变">锁</button></div>
+    <div class="gen-row"><label>全马次数</label><input type="number" id="inFull" min="0" max="31"><button class="gen-lock" data-key="full" title="锁定：随机时保持不变">锁</button></div>
 
-    <button class="gen-btn" id="btnRandom">随机一整套</button>
+    <button class="gen-btn" id="btnRandom">随机（锁定项不变）</button>
     <button class="gen-btn gray" id="btnRedist">只换分布</button>
+    <button class="gen-btn gray" id="btnUnlock">全部解锁</button>
 
     <p class="gen-tip">
+      改过的数字会自动上锁（绿色「锁」），随机时保持不变，其余项按它重新算；再点一下「锁」可解锁。上月公里永远只按你填的来。<br>
       配速由「累计时长 ÷ 本月公里」算出，累计次数就是柱子根数；半马/全马次数会在图里生成对应长度的那几根柱子（≥21.10 / ≥42.20 公里），总和始终等于本月公里。<br>
       截图：把按钮闲置 3 秒自动隐藏后用系统截屏，轻点页面可唤出。加到主屏幕打开即为全屏，状态栏是手机自己的。
     </p>
@@ -305,20 +314,25 @@ var $ = function (id) { return document.getElementById(id); };
 var state = load();
 var daily = [];
 
+/* 手动改过的项会上锁，随机时保持不变；上月公里不参与随机 */
+var LOCKABLE = ['dist', 'count', 'time', 'half', 'full'];
+function noLocks() { return { dist: 0, count: 0, time: 0, half: 0, full: 0 }; }
+
 function defaults() {
   var now = new Date();
   return {
     year: now.getFullYear(), month: now.getMonth() + 1,
     dist: 46.98, last: 43.07, count: 13,
-    time: '10:59:40', half: 1, full: 0, seed: 20260915
+    time: '10:59:40', half: 1, full: 0, seed: 20260915, lock: noLocks()
   };
 }
 function load() {
+  var st = defaults();
   try {
     var s = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (s && s.dist) return Object.assign(defaults(), s);
+    if (s && s.dist) { st = Object.assign(st, s); st.lock = Object.assign(noLocks(), s.lock); }
   } catch (e) {}
-  return defaults();
+  return st;
 }
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
 
@@ -355,6 +369,10 @@ function makeRng(seed) {
   };
 }
 
+/* 给定次数/半马/全马时，本月公里的可行区间 */
+function lowBound(count, half, full) { return (count - half - full) * DAY_MIN + half * HALF_MIN + full * FULL_MIN; }
+function highBound(count, half, full) { return (count - half - full) * DAY_MAX + half * HALF_MAX + full * FULL_MAX; }
+
 /* n 个在 [min,max] 区间、和恰为 total 的随机值 */
 function spread(total, n, min, max, rng) {
   if (n <= 0) return [];
@@ -382,9 +400,9 @@ function buildDaily() {
 
   // 普通天不触到半马线，半马天 21.10~42.00，全马天 42.20 起
   var others = count - full - half;
-  var floorCap = others * DAY_MIN + half * HALF_MIN + full * FULL_MIN;
-  var ceilCap = others * DAY_MAX + half * HALF_MAX + full * FULL_MAX;
-  var total = clamp(round2(state.dist) || 0, Math.ceil(floorCap * 100) / 100, Math.floor(ceilCap * 100) / 100);
+  var total = clamp(round2(state.dist) || 0,
+    Math.ceil(lowBound(count, half, full) * 100) / 100,
+    Math.floor(highBound(count, half, full) * 100) / 100);
 
   state.full = full; state.half = half; state.count = count; state.dist = total;
 
@@ -482,7 +500,11 @@ function renderChart() {
 }
 
 function render() {
+  var wanted = state.dist;
   buildDaily();
+  if (Math.abs(state.dist - wanted) > 0.005) {
+    toast('里程和次数/半马/全马对不上，已改成 ' + state.dist.toFixed(2) + ' 公里');
+  }
 
   var sec = parseHMS(state.time);
   $('oMonth').textContent = state.year + '/' + pad(state.month);
@@ -517,25 +539,51 @@ function syncPanel() {
   $('inPace').value = fmtPace(parseHMS(state.time), state.dist);
   $('inHalf').value = state.half;
   $('inFull').value = state.full;
+  LOCKABLE.forEach(function (k) {
+    var on = !!state.lock[k];
+    $('in' + k.charAt(0).toUpperCase() + k.slice(1)).classList.toggle('locked', on);
+    document.querySelector('.gen-lock[data-key="' + k + '"]').classList.toggle('on', on);
+  });
 }
 
-/* 一次随机出互相自洽的一整套：里程/次数/时长/半马/全马/分布 */
+/* 随机出互相自洽的一套：锁定项照用，其余围着它算 */
 function randomize() {
   var rng = makeRng((Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) | 0);
   var days = daysInMonth(state.year, state.month);
-  var full = rng() < 0.08 ? 1 : 0;
-  var half = full ? (rng() < 0.4 ? 1 : 0) : (rng() < 0.3 ? 1 : (rng() < 0.08 ? 2 : 0));
-  var count = clamp(Math.round(8 + rng() * 12), full + half + 2, days);
-  var normal = count - full - half;
-  var total = round2(full * (FULL_MIN + rng() * 2) + half * (HALF_MIN + rng() * 4) +
-    normal * (1.8 + rng() * 2.6));
-  var pace = 420 + rng() * 360;           // 7'00" ~ 13'00" 每公里
+  var L = state.lock;
+
+  var full = clamp(L.full ? state.full : (rng() < 0.08 ? 1 : 0), 0, days);
+  var half = clamp(L.half ? state.half : (full ? (rng() < 0.4 ? 1 : 0) : (rng() < 0.3 ? 1 : (rng() < 0.08 ? 2 : 0))), 0, days - full);
+  var avg = 1.8 + rng() * 2.6;            // 普通一天跑多少公里
+  var special = full * (FULL_MIN + rng() * 2) + half * (HALF_MIN + rng() * 4);
+  var floor = Math.max(1, full + half);
+
+  var count = L.count ? clamp(state.count, floor, days) : null;
+  var total = L.dist ? state.dist : null;
+  if (count === null) {
+    count = total !== null
+      ? clamp(Math.round((total - full * FULL_MIN - half * HALF_MIN) / avg) + full + half, floor, days)
+      : clamp(Math.round(8 + rng() * 12), Math.max(floor, full + half + 2), days);
+  }
+  if (total === null) total = round2(special + (count - full - half) * avg);
+
+  // 锁住的里程说了算：装不下就先砍随机出来的全马/半马，再砍次数
+  while (L.dist && total < lowBound(count, half, full)) {
+    if (!L.full && full > 0) full--;
+    else if (!L.half && half > 0) half--;
+    else if (!L.count && count > Math.max(1, half + full)) count--;
+    else break;
+  }
+  while (L.dist && total > highBound(count, half, full)) {
+    if (!L.count && count < days) count++;
+    else break;
+  }
+
   state.full = full;
   state.half = half;
   state.count = count;
-  state.dist = total;
-  state.time = fmtHMS(total * pace);
-  state.last = round2(total * (0.45 + rng() * 1.1));
+  state.dist = round2(total);
+  state.time = L.time ? state.time : fmtHMS(total * (420 + rng() * 360));   // 7'00"~13'00" 每公里
   state.seed = Math.floor(rng() * 0x7fffffff);
   render();
 }
@@ -546,6 +594,7 @@ function bindNum(id, key, min, max, isFloat) {
     var v = isFloat ? parseFloat(this.value) : parseInt(this.value, 10);
     if (isNaN(v)) { syncPanel(); return; }
     state[key] = clamp(isFloat ? round2(v) : v, min, max);
+    if (key in state.lock) state.lock[key] = 1;
     render();
   });
 }
@@ -556,7 +605,23 @@ bindNum('inCount', 'count', 1, 31, false);
 bindNum('inHalf', 'half', 0, 31, false);
 bindNum('inFull', 'full', 0, 31, false);
 $('inMonth').addEventListener('change', function () { state.month = +this.value; render(); });
-$('inTime').addEventListener('change', function () { state.time = fmtHMS(parseHMS(this.value)); render(); });
+$('inTime').addEventListener('change', function () {
+  state.time = fmtHMS(parseHMS(this.value));
+  state.lock.time = 1;
+  render();
+});
+Array.prototype.forEach.call(document.querySelectorAll('.gen-lock'), function (btn) {
+  btn.addEventListener('click', function () {
+    var k = btn.getAttribute('data-key');
+    state.lock[k] = state.lock[k] ? 0 : 1;
+    render();
+  });
+});
+$('btnUnlock').addEventListener('click', function () {
+  state.lock = noLocks();
+  render();
+  toast('已全部解锁');
+});
 $('btnRandom').addEventListener('click', randomize);
 $('btnRedist').addEventListener('click', function () {
   state.seed = (state.seed * 1103515245 + 12345) & 0x7fffffff;
